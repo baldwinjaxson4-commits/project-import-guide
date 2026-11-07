@@ -95,12 +95,13 @@ describe("platformer sim", () => {
     expect(w.status).toBe("won");
   });
 
-  it("there are 7 worlds and every world has Minecraft mobs", () => {
+  it("there are 7 worlds and every enemy is a Minecraft mob", () => {
     expect(LEVELS.length).toBe(7);
     const w = createWorld();
     for (let i = 0; i < LEVELS.length; i++) {
       gotoLevel(w, i);
-      expect(w.enemies.some((e) => e.kind !== "mushling")).toBe(true);
+      expect(w.enemies.length).toBeGreaterThan(0);
+      for (const e of w.enemies) expect(["spider", "creeper", "zombie", "skeleton", "slime"]).toContain(e.kind);
     }
   });
 
@@ -179,7 +180,7 @@ describe("platformer sim", () => {
     const w = createWorld();
     expect(powerFor(w, 21, 5)).toBe("apple");
     w.player.big = true;
-    expect(["fire", "armor", "totem"]).toContain(powerFor(w, 21, 5));
+    expect(["sword", "fire", "armor", "totem"]).toContain(powerFor(w, 21, 5));
   });
 
   it("Diamond Armor makes the player invincible and defeats mobs on touch", () => {
@@ -193,6 +194,36 @@ describe("platformer sim", () => {
     stepWorld(w, idle, 1 / 60);
     expect(w.status).toBe("playing");
     expect(e.state).toBe("flipped");
+  });
+
+  it("Diamond Sword swing defeats a mob in front of the player", () => {
+    const w = createWorld();
+    startGame(w);
+    collectPower(w, "sword");
+    expect(w.player.sword).toBe(true);
+    const e = w.enemies[0]!;
+    e.state = "walk";
+    e.vx = 0;
+    w.player.x = e.x - 1.4;
+    w.player.facing = 1;
+    sim(w, idle, 1 / 60);
+    stepWorld(w, { ...idle, run: true }, 1 / 60);
+    expect(e.state).toBe("flipped");
+  });
+
+  it("Diamond Sword does not reach mobs behind the player", () => {
+    const w = createWorld();
+    startGame(w);
+    collectPower(w, "sword");
+    const e = w.enemies[0]!;
+    e.state = "walk";
+    e.vx = 0;
+    w.player.x = e.x + 1.4;
+    w.player.facing = 1;
+    sim(w, idle, 1 / 60);
+    w.player.facing = 1;
+    stepWorld(w, { ...idle, run: true }, 1 / 60);
+    expect(e.state).toBe("walk");
   });
 
   it("Totem of Undying gives an extra life", () => {

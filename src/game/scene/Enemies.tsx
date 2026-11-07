@@ -46,25 +46,34 @@ function useMob(index: number, extra?: (e: Enemy, t: number) => void) {
   return { root, body, legA, legB };
 }
 
-function Mushling({ index }: { index: number }) {
-  const { root, body, legA, legB } = useMob(index);
+function Spider({ index, cave }: { index: number; cave: boolean }) {
+  const body = cave ? "#1e3a40" : "#2e2620";
+  const legC = cave ? "#14282c" : "#1e1814";
+  const { root, body: bodyRef, legA, legB } = useMob(index);
+  const legs = [-0.3, -0.1, 0.1, 0.3];
   return (
     <group ref={root}>
-      <group ref={body}>
-        <group ref={legA} position={[-0.22, 0.14, 0.05]}>
-          <Part size={[0.3, 0.14, 0.4]} pos={[0, -0.07, 0]} color="#1c1208" />
+      <group ref={bodyRef}>
+        <group rotation-y={-Math.PI / 2}>
+        <Part size={[0.7, 0.4, 0.6]} pos={[-0.15, 0.4, 0]} color={body} />
+        <Part size={[0.36, 0.32, 0.4]} pos={[0.2, 0.38, 0]} color={legC} />
+        <Part size={[0.42, 0.4, 0.44]} pos={[0.48, 0.4, 0]} color={body} />
+        {/* red eyes */}
+        <Part size={[0.03, 0.08, 0.08]} pos={[0.7, 0.46, -0.12]} color="#e01010" />
+        <Part size={[0.03, 0.08, 0.08]} pos={[0.7, 0.46, 0.12]} color="#e01010" />
+        <Part size={[0.03, 0.06, 0.06]} pos={[0.7, 0.36, -0.06]} color="#e01010" />
+        <Part size={[0.03, 0.06, 0.06]} pos={[0.7, 0.36, 0.06]} color="#e01010" />
+        <group ref={legA}>
+          {legs.map((x, i) => (
+            <Part key={`a${i}`} size={[0.08, 0.08, 0.6]} pos={[x + 0.1, 0.35 - (i % 2) * 0.05, 0.45]} color={legC} />
+          ))}
         </group>
-        <group ref={legB} position={[0.22, 0.14, 0.05]}>
-          <Part size={[0.3, 0.14, 0.4]} pos={[0, -0.07, 0]} color="#1c1208" />
+        <group ref={legB}>
+          {legs.map((x, i) => (
+            <Part key={`b${i}`} size={[0.08, 0.08, 0.6]} pos={[x + 0.1, 0.35 - ((i + 1) % 2) * 0.05, -0.45]} color={legC} />
+          ))}
         </group>
-        <Part size={[0.5, 0.26, 0.5]} pos={[0, 0.27, 0]} color="#f2c890" />
-        <Part size={[0.86, 0.46, 0.86]} pos={[0, 0.6, 0]} color="#8a3c14" />
-        <Part size={[0.6, 0.12, 0.6]} pos={[0, 0.88, 0]} color="#6a2a0c" />
-        <Part size={[0.6, 0.22, 0.04]} pos={[0, 0.5, 0.43]} color="#f2c890" />
-        <Part size={[0.14, 0.18, 0.03]} pos={[-0.15, 0.6, 0.45]} color="#ffffff" />
-        <Part size={[0.14, 0.18, 0.03]} pos={[0.15, 0.6, 0.45]} color="#ffffff" />
-        <Part size={[0.07, 0.1, 0.03]} pos={[-0.13, 0.58, 0.47]} color="#141414" />
-        <Part size={[0.07, 0.1, 0.03]} pos={[0.13, 0.58, 0.47]} color="#141414" />
+        </group>
       </group>
     </group>
   );
@@ -204,7 +213,7 @@ export function Enemies() {
           case "slime":
             return <Slime key={i} index={i} magma={theme === "nether"} />;
           default:
-            return <Mushling key={i} index={i} />;
+            return <Spider key={i} index={i} cave={theme === "cave"} />;
         }
       })}
     </>

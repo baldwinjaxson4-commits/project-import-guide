@@ -13,7 +13,7 @@ export const T = {
 export type TileId = (typeof T)[keyof typeof T];
 
 export type Theme = "grass" | "desert" | "sky" | "nether" | "cave" | "snow" | "end";
-export type EnemyKind = "mushling" | "creeper" | "zombie" | "skeleton" | "slime";
+export type EnemyKind = "spider" | "creeper" | "zombie" | "skeleton" | "slime";
 export interface EnemySpawn {
   x: number;
   y: number;
@@ -88,7 +88,7 @@ class Builder {
     for (let x = x0; x <= x1; x++) this.coins.push({ x: x + 0.5, y: y + 0.5 });
   }
   enemy(x: number, y = 2) {
-    this.enemies.push({ x, y, kind: "mushling" });
+    this.enemies.push({ x, y, kind: "spider" });
   }
   mob(kind: EnemyKind, x: number, y = 2) {
     this.enemies.push({ x, y, kind });

@@ -30,7 +30,7 @@ export const ENEMY_SPEED = 2;
 export const ENEMY_W = 0.85;
 export const ENEMY_H = 0.85;
 export const ENEMY_WAKE_DISTANCE = 15;
-export const MUSHROOM_SPEED = 3.5;
+export const POWERUP_SPEED = 3.5;
 
 export const LEVEL_TIME = 300;
 export const TIME_SCALE = 2.5; // timer units per real second
@@ -63,3 +63,6 @@ export const FIREBALL_SPEED = 12;
 export const FIREBALL_BOUNCE = 7;
 export const MAX_FIREBALLS = 2;
 export const LEVEL_CLEAR_TIME = 3;
+export const SWORD_REACH = 1.8; // tiles in front of the player
+export const SWORD_SWING_TIME = 0.25;
+export const SWORD_COOLDOWN = 0.35;
