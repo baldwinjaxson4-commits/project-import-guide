@@ -31,10 +31,16 @@ function Vox({
   mat?: THREE.Material;
 }) {
   return (
-    <mesh position={pos} castShadow material={mat}>
-      <boxGeometry args={size} />
-      {!mat && <meshStandardMaterial color={color} roughness={0.9} />}
-    </mesh>
+    <>{mat ? (
+      <mesh position={pos} castShadow material={mat}>
+        <boxGeometry args={size} />
+      </mesh>
+    ) : (
+      <mesh position={pos} castShadow>
+        <boxGeometry args={size} />
+        <meshStandardMaterial color={color ?? "#ffffff"} roughness={0.9} />
+      </mesh>
+    )}</>
   );
 }
 
