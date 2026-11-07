@@ -54,6 +54,7 @@ function Spider({ index, cave }: { index: number; cave: boolean }) {
   return (
     <group ref={root}>
       <group ref={bodyRef}>
+        <group rotation-y={-Math.PI / 2}>
         <Part size={[0.7, 0.4, 0.6]} pos={[-0.15, 0.4, 0]} color={body} />
         <Part size={[0.36, 0.32, 0.4]} pos={[0.2, 0.38, 0]} color={legC} />
         <Part size={[0.42, 0.4, 0.44]} pos={[0.48, 0.4, 0]} color={body} />
@@ -71,6 +72,7 @@ function Spider({ index, cave }: { index: number; cave: boolean }) {
           {legs.map((x, i) => (
             <Part key={`b${i}`} size={[0.08, 0.08, 0.6]} pos={[x + 0.1, 0.35 - ((i + 1) % 2) * 0.05, -0.45]} color={legC} />
           ))}
+        </group>
         </group>
       </group>
     </group>
