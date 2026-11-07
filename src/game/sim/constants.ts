@@ -63,3 +63,6 @@ export const FIREBALL_SPEED = 12;
 export const FIREBALL_BOUNCE = 7;
 export const MAX_FIREBALLS = 2;
 export const LEVEL_CLEAR_TIME = 3;
+export const SWORD_REACH = 1.8; // tiles in front of the player
+export const SWORD_SWING_TIME = 0.25;
+export const SWORD_COOLDOWN = 0.35;

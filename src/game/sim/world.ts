@@ -21,6 +21,7 @@ export type GameEvent =
   | "explode"
   | "shoot"
   | "fireball"
+  | "swing"
   | "armor";
 
 export interface Body {
@@ -44,6 +45,10 @@ export interface Player extends Body {
   visible: boolean;
   /** Fire Charge power: press run to throw fireballs. */
   fire: boolean;
+  /** Diamond Sword power: press run to swing. */
+  sword: boolean;
+  swing: number; // seconds left in the current swing animation
+  swingCooldown: number;
   /** Seconds of Diamond Armor (invincibility) left. */
   armor: number;
   runHeldPrev: boolean;
@@ -63,8 +68,8 @@ export interface Enemy extends Body {
   children: number[];
 }
 
-export type PowerKind = "apple" | "fire" | "armor" | "totem";
-export const POWER_KINDS: PowerKind[] = ["apple", "fire", "armor", "totem"];
+export type PowerKind = "apple" | "fire" | "sword" | "armor" | "totem";
+export const POWER_KINDS: PowerKind[] = ["apple", "fire", "sword", "armor", "totem"];
 
 export interface Item extends Body {
   kind: PowerKind;
@@ -157,13 +162,16 @@ function makePlayer(level: LevelData): Player {
     invuln: 0,
     visible: true,
     fire: false,
+    sword: false,
+    swing: 0,
+    swingCooldown: 0,
     armor: 0,
     runHeldPrev: true,
   };
 }
 
 const MOB_SIZE: Record<EnemyKind, [number, number]> = {
-  mushling: [C.ENEMY_W, C.ENEMY_H],
+  spider: [1.05, C.ENEMY_H * 0.8],
   creeper: [0.8, 1.6],
   zombie: [0.8, 1.8],
   skeleton: [0.7, 1.8],
@@ -365,7 +373,7 @@ function addCoin(w: World) {
 /** Small players always get a Golden Apple; big players get a block-specific special power-up. */
 export function powerFor(w: World, tx: number, ty: number): PowerKind {
   if (!w.player.big) return "apple";
-  const specials: PowerKind[] = ["fire", "armor", "totem"];
+  const specials: PowerKind[] = ["sword", "fire", "armor", "totem"];
   return specials[(tx * 7 + ty * 3 + w.levelIndex) % specials.length]!;
 }
 
@@ -435,6 +443,7 @@ function killPlayer(w: World) {
   p.vy = 14;
   p.big = false;
   p.fire = false;
+  p.sword = false;
   p.armor = 0;
   p.h = C.SMALL_H;
   w.events.push("die");
@@ -446,6 +455,7 @@ function hurtPlayer(w: World) {
   if (p.big) {
     p.big = false;
     p.fire = false;
+    p.sword = false;
     p.h = C.SMALL_H;
     p.invuln = C.INVULN_TIME;
     w.events.push("shrink");
@@ -513,6 +523,9 @@ function stepPlayer(w: World, input: Input, dt: number) {
 
   const runPressed = input.run && !p.runHeldPrev;
   p.runHeldPrev = input.run;
+  if (p.swing > 0) p.swing = Math.max(0, p.swing - dt);
+  if (p.swingCooldown > 0) p.swingCooldown = Math.max(0, p.swingCooldown - dt);
+  if (runPressed && p.sword && p.swingCooldown <= 0) swingSword(w);
   if (runPressed && p.fire) {
     const live = w.projectiles.filter((f) => f.alive && f.kind === "fireball").length;
     if (live < C.MAX_FIREBALLS) {
@@ -563,6 +576,19 @@ function explode(w: World, e: Enemy) {
   const p = w.player;
   if (Math.hypot(p.x - cx, p.y + p.h / 2 - cy) < r) hurtPlayer(w);
   w.events.push("explode");
+}
+
+/** Diamond Sword swing: defeats every mob within reach in front of the player. */
+export function swingSword(w: World) {
+  const p = w.player;
+  p.swing = C.SWORD_SWING_TIME;
+  p.swingCooldown = C.SWORD_COOLDOWN;
+  w.events.push("swing");
+  const hitbox = { x: p.x + p.facing * (C.SWORD_REACH / 2), y: p.y - 0.2, w: C.SWORD_REACH, h: p.h + 0.4 };
+  for (const e of w.enemies) {
+    if (e.state !== "walk" && e.state !== "fuse" && e.state !== "sleep") continue;
+    if (overlap(e, hitbox)) kill(w, e, p.facing, 200);
+  }
 }
 
 function stepEnemies(w: World, dt: number) {
@@ -643,10 +669,10 @@ function stepEnemies(w: World, dt: number) {
   const n = w.enemies.length;
   for (let i = 0; i < n; i++) {
     const a = w.enemies[i]!;
-    if (a.state !== "walk" || a.kind !== "mushling") continue;
+    if (a.state !== "walk" || a.kind !== "spider") continue;
     for (let j = i + 1; j < n; j++) {
       const b = w.enemies[j]!;
-      if (b.state !== "walk" || b.kind !== "mushling" || !overlap(a, b)) continue;
+      if (b.state !== "walk" || b.kind !== "spider" || !overlap(a, b)) continue;
       const left = a.x < b.x ? a : b;
       const right = left === a ? b : a;
       left.vx = -Math.abs(left.vx || C.ENEMY_SPEED);
@@ -771,7 +797,14 @@ export function collectPower(w: World, kind: PowerKind) {
     p.big = true;
     p.h = C.BIG_H;
   }
-  if (kind === "fire") p.fire = true;
+  if (kind === "fire") {
+    p.fire = true;
+    p.sword = false;
+  }
+  if (kind === "sword") {
+    p.sword = true;
+    p.fire = false;
+  }
   if (kind === "armor") {
     p.armor = C.ARMOR_TIME;
     w.events.push("armor");
