@@ -4,11 +4,12 @@ import { Environment, Lightformer } from "@react-three/drei";
 import * as THREE from "three";
 import { beginOrRestart, getGame, useHud } from "./game";
 import { playSfx, unlockAudio } from "./audio";
-import { stepWorld, type Input } from "./sim/world";
+import { gotoLevel, stepWorld, type Input } from "./sim/world";
 import { Tiles, Pipes } from "./scene/Tiles";
 import { Player } from "./scene/Player";
 import { Enemies } from "./scene/Enemies";
-import { Coins, Mushrooms } from "./scene/Items";
+import { Coins, Powerups, Projectiles } from "./scene/Items";
+import { themeLook } from "./scene/themes";
 import { Decor } from "./scene/Decor";
 import { Hud } from "./ui/Hud";
 
@@ -32,7 +33,7 @@ function readGamepad(): Input {
 }
 
 /** The single per-frame stepper: input -> sim -> sounds -> camera/light -> HUD. */
-function Stepper({ onReady }: { onReady: () => void }) {
+function Stepper({ onReady, sunIntensity }: { onReady: () => void; sunIntensity: number }) {
   const sun = useRef<THREE.DirectionalLight>(null);
   const frames = useRef(0);
 
@@ -68,14 +69,27 @@ function Stepper({ onReady }: { onReady: () => void }) {
 
     const hud = useHud.getState();
     const time = Math.ceil(w.time);
+    const power = p.armor > 0 ? `ARMOR ${Math.ceil(p.armor)}` : p.fire ? "FIRE" : "";
     if (
       hud.score !== w.score ||
       hud.coins !== w.coinCount ||
       hud.lives !== w.lives ||
       hud.time !== time ||
-      hud.status !== w.status
+      hud.status !== w.status ||
+      hud.levelIndex !== w.levelIndex ||
+      hud.power !== power
     ) {
-      useHud.setState({ score: w.score, coins: w.coinCount, lives: w.lives, time, status: w.status });
+      useHud.setState({
+        score: w.score,
+        coins: w.coinCount,
+        lives: w.lives,
+        time,
+        status: w.status,
+        levelIndex: w.levelIndex,
+        worldName: w.level.name,
+        worldTitle: w.level.title,
+        power,
+      });
     }
 
     frames.current++;
@@ -85,7 +99,7 @@ function Stepper({ onReady }: { onReady: () => void }) {
   return (
     <directionalLight
       ref={sun}
-      intensity={1.9}
+      intensity={sunIntensity}
       color="#fff4dc"
       castShadow
       shadow-mapSize={[2048, 2048]}
@@ -156,6 +170,9 @@ function useDebugHooks() {
         return getGame().world;
       },
       start: beginOrRestart,
+      goto(index: number) {
+        gotoLevel(getGame().world, index);
+      },
       sim(seconds: number, input: Partial<Input> = {}) {
         const w = getGame().world;
         const inp: Input = { left: false, right: false, jump: false, run: false, ...input };
@@ -169,6 +186,8 @@ function useDebugHooks() {
 
 export default function Game() {
   const [ready, setReady] = useState(false);
+  const levelIndex = useHud((s) => s.levelIndex);
+  const look = themeLook(getGame().world.level.theme);
   useKeyboard();
   useDebugHooks();
 
@@ -181,22 +200,26 @@ export default function Game() {
         camera={{ fov: 40, position: [CAM_HALF_WIDTH, 6.8, 17], near: 0.1, far: 200 }}
         onPointerDown={unlockAudio}
       >
-        <color attach="background" args={["#8fd0ff"]} />
-        <fog attach="fog" args={["#bfe6ff", 26, 70]} />
-        <hemisphereLight args={["#dff1ff", "#6b4a2a", 0.95]} />
-        <Stepper onReady={() => setReady(true)} />
+        <color key={`bg${levelIndex}`} attach="background" args={[look.sky]} />
+        <fog key={`fog${levelIndex}`} attach="fog" args={[look.fog, 26, 70]} />
+        <hemisphereLight key={`hemi${levelIndex}`} args={[look.hemiSky, look.hemiGround, 0.95]} />
+        <Stepper onReady={() => setReady(true)} sunIntensity={look.sun} />
         <Suspense fallback={null}>
           <Environment resolution={64}>
             <Lightformer intensity={1.2} position={[0, 6, 0]} rotation-x={Math.PI / 2} scale={[12, 12, 1]} />
             <Lightformer intensity={0.6} color="#bfe0ff" position={[-6, 2, 4]} rotation-y={Math.PI / 3} scale={[12, 3, 1]} />
           </Environment>
         </Suspense>
-        <Tiles />
-        <Pipes />
-        <Decor />
-        <Coins />
-        <Mushrooms />
-        <Enemies />
+        {/* Level-shaped meshes are rebuilt whenever the world changes. */}
+        <group key={levelIndex}>
+          <Tiles />
+          <Pipes />
+          <Decor />
+          <Coins />
+          <Powerups />
+          <Enemies />
+          <Projectiles />
+        </group>
         <Player />
       </Canvas>
       <Hud />

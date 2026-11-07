@@ -27,6 +27,10 @@ export interface HudState {
   time: number;
   status: Status;
   muted: boolean;
+  levelIndex: number;
+  worldName: string;
+  worldTitle: string;
+  power: string;
 }
 
 export const useHud = create<HudState>(() => ({
@@ -36,6 +40,10 @@ export const useHud = create<HudState>(() => ({
   time: 300,
   status: "title",
   muted: false,
+  levelIndex: 0,
+  worldName: "1-1",
+  worldTitle: "GRASSLAND",
+  power: "",
 }));
 
 /** Start from the title screen, or restart after game over / course clear. */
