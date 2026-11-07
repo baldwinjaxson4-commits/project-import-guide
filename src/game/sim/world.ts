@@ -1,8 +1,8 @@
 // Game simulation: player, enemies, items, blocks and rules. Pure TypeScript.
 import * as C from "./constants";
-import { buildLevel, T, type LevelData } from "./level";
+import { buildLevel, LEVELS, T, type EnemyKind, type LevelData } from "./level";
 
-export type Status = "title" | "playing" | "dying" | "flag" | "won" | "gameover";
+export type Status = "title" | "playing" | "dying" | "flag" | "clear" | "won" | "gameover";
 export type GameEvent =
   | "jump"
   | "coin"
@@ -16,7 +16,12 @@ export type GameEvent =
   | "flag"
   | "win"
   | "oneup"
-  | "kick";
+  | "kick"
+  | "fuse"
+  | "explode"
+  | "shoot"
+  | "fireball"
+  | "armor";
 
 export interface Body {
   x: number; // center
@@ -37,16 +42,44 @@ export interface Player extends Body {
   jumping: boolean;
   invuln: number;
   visible: boolean;
+  /** Fire Charge power: press run to throw fireballs. */
+  fire: boolean;
+  /** Seconds of Diamond Armor (invincibility) left. */
+  armor: number;
+  runHeldPrev: boolean;
 }
 
 export interface Enemy extends Body {
-  state: "sleep" | "walk" | "squashed" | "flipped" | "dead";
+  kind: EnemyKind;
+  state: "sleep" | "walk" | "fuse" | "squashed" | "flipped" | "dead";
   timer: number;
+  hp: number;
+  /** Zombie stun / slime hop / skeleton reload countdown. */
+  cooldown: number;
+  homeX: number;
+  /** Slimes: 2 = big (splits when stomped), 1 = small. */
+  size: number;
+  /** Indices of the two hidden small slimes a big slime splits into. */
+  children: number[];
 }
 
-export interface Mushroom extends Body {
+export type PowerKind = "apple" | "fire" | "armor" | "totem";
+export const POWER_KINDS: PowerKind[] = ["apple", "fire", "armor", "totem"];
+
+export interface Item extends Body {
+  kind: PowerKind;
   state: "emerging" | "moving" | "gone";
   startY: number;
+}
+
+export interface Projectile {
+  kind: "arrow" | "fireball";
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  t: number;
+  alive: boolean;
 }
 
 export interface Coin {
@@ -56,7 +89,7 @@ export interface Coin {
 }
 
 export interface Effect {
-  kind: "coin" | "debris";
+  kind: "coin" | "debris" | "smoke";
   x: number;
   y: number;
   vx: number;
@@ -84,7 +117,8 @@ export interface World {
   tilesVersion: number;
   player: Player;
   enemies: Enemy[];
-  mushrooms: Mushroom[];
+  items: Item[];
+  projectiles: Projectile[];
   coins: Coin[];
   effects: Effect[];
   bumps: Bump[];
@@ -98,6 +132,8 @@ export interface World {
   flagY: number;
   elapsed: number;
   levelId: number;
+  levelIndex: number;
+  clearTimer: number;
   events: GameEvent[];
 }
 
@@ -120,27 +156,62 @@ function makePlayer(level: LevelData): Player {
     jumping: false,
     invuln: 0,
     visible: true,
+    fire: false,
+    armor: 0,
+    runHeldPrev: true,
   };
 }
 
-export function resetLevel(w: World) {
-  const level = buildLevel();
-  w.level = level;
-  w.tiles = level.tiles;
-  w.tilesVersion++;
-  w.player = makePlayer(level);
-  w.enemies = level.enemies.map((e) => ({
-    x: e.x,
-    y: e.y,
-    w: C.ENEMY_W,
-    h: C.ENEMY_H,
+const MOB_SIZE: Record<EnemyKind, [number, number]> = {
+  mushling: [C.ENEMY_W, C.ENEMY_H],
+  creeper: [0.8, 1.6],
+  zombie: [0.8, 1.8],
+  skeleton: [0.7, 1.8],
+  slime: [1.3, 1.3],
+};
+
+function makeEnemy(kind: EnemyKind, x: number, y: number, size = 2): Enemy {
+  const [ew, eh] = kind === "slime" && size === 1 ? [0.7, 0.7] : MOB_SIZE[kind];
+  return {
+    kind,
+    x,
+    y,
+    w: ew,
+    h: eh,
     vx: 0,
     vy: 0,
     onGround: true,
     state: "sleep",
     timer: 0,
-  }));
-  w.mushrooms = [];
+    hp: kind === "zombie" ? C.ZOMBIE_HP : 1,
+    cooldown: kind === "skeleton" ? 1 : 0,
+    homeX: x,
+    size: kind === "slime" ? size : 1,
+    children: [],
+  };
+}
+
+export function resetLevel(w: World) {
+  const level = buildLevel(w.levelIndex);
+  w.level = level;
+  w.tiles = level.tiles;
+  w.tilesVersion++;
+  w.player = makePlayer(level);
+  w.enemies = level.enemies.map((e) => makeEnemy(e.kind, e.x, e.y));
+  // Pre-allocate the small slimes each big slime splits into, so the scene's mob count never changes.
+  const n = w.enemies.length;
+  for (let i = 0; i < n; i++) {
+    const e = w.enemies[i]!;
+    if (e.kind !== "slime") continue;
+    for (let k = 0; k < 2; k++) {
+      const child = makeEnemy("slime", e.x, e.y, 1);
+      child.state = "dead";
+      e.children.push(w.enemies.length);
+      w.enemies.push(child);
+    }
+  }
+  w.items = [];
+  w.projectiles = [];
   w.coins = level.coins.map((c) => ({ ...c, taken: false }));
   w.effects = [];
   w.bumps = [];
@@ -160,6 +231,8 @@ export function createWorld(): World {
     lives: C.START_LIVES,
     elapsed: 0,
     levelId: 0,
+    levelIndex: 0,
+    clearTimer: 0,
     events: [],
   } as unknown as World;
   resetLevel(w);
@@ -178,6 +251,7 @@ export function restartGame(w: World) {
   w.score = 0;
   w.coinCount = 0;
   w.lives = C.START_LIVES;
+  w.levelIndex = 0;
   resetLevel(w);
   w.status = "playing";
 }
@@ -288,6 +362,13 @@ function addCoin(w: World) {
   }
 }
 
+/** Small players always get a Golden Apple; big players get a block-specific special power-up. */
+export function powerFor(w: World, tx: number, ty: number): PowerKind {
+  if (!w.player.big) return "apple";
+  const specials: PowerKind[] = ["fire", "armor", "totem"];
+  return specials[(tx * 7 + ty * 3 + w.levelIndex) % specials.length]!;
+}
+
 function hitBlock(w: World, tx: number, ty: number) {
   const t = tileAt(w, tx, ty);
   const p = w.player;
@@ -299,7 +380,8 @@ function hitBlock(w: World, tx: number, ty: number) {
   } else if (t === T.QPOWER) {
     setTile(w, tx, ty, T.USED);
     w.bumps.push({ tx, ty, t: 0 });
-    w.mushrooms.push({
+    w.items.push({
+      kind: powerFor(w, tx, ty),
       x: tx + 0.5,
       y: ty + 0.2,
       w: 0.8,
@@ -333,7 +415,7 @@ function hitBlock(w: World, tx: number, ty: number) {
   }
   // Knock out enemies standing on the bumped block.
   for (const e of w.enemies) {
-    if (e.state !== "walk") continue;
+    if (e.state !== "walk" && e.state !== "fuse") continue;
     if (Math.abs(e.y - (ty + 1)) < 0.2 && Math.abs(e.x - (tx + 0.5)) < 0.9) {
       e.state = "flipped";
       e.vy = 8;
@@ -352,15 +434,18 @@ function killPlayer(w: World) {
   p.vx = 0;
   p.vy = 14;
   p.big = false;
+  p.fire = false;
+  p.armor = 0;
   p.h = C.SMALL_H;
   w.events.push("die");
 }
 
 function hurtPlayer(w: World) {
   const p = w.player;
-  if (p.invuln > 0) return;
+  if (p.invuln > 0 || p.armor > 0) return;
   if (p.big) {
     p.big = false;
+    p.fire = false;
     p.h = C.SMALL_H;
     p.invuln = C.INVULN_TIME;
     w.events.push("shrink");
@@ -424,7 +509,60 @@ function stepPlayer(w: World, input: Input, dt: number) {
   }
 
   if (p.invuln > 0) p.invuln -= dt;
+  if (p.armor > 0) p.armor = Math.max(0, p.armor - dt);
+
+  const runPressed = input.run && !p.runHeldPrev;
+  p.runHeldPrev = input.run;
+  if (runPressed && p.fire) {
+    const live = w.projectiles.filter((f) => f.alive && f.kind === "fireball").length;
+    if (live < C.MAX_FIREBALLS) {
+      w.projectiles.push({
+        kind: "fireball",
+        x: p.x + p.facing * 0.5,
+        y: p.y + p.h * 0.6,
+        vx: p.facing * C.FIREBALL_SPEED,
+        vy: -2,
+        t: 0,
+        alive: true,
+      });
+      w.events.push("fireball");
+    }
+  }
   if (p.y < C.PIT_Y) killPlayer(w);
+}
+
+function kill(w: World, e: Enemy, dir: number, score = 100) {
+  e.state = "flipped";
+  e.vy = 8;
+  e.vx = dir * 2;
+  addScore(w, score);
+  w.events.push("kick");
+}
+
+function explode(w: World, e: Enemy) {
+  e.state = "dead";
+  const cx = e.x;
+  const cy = e.y + e.h / 2;
+  const r = C.EXPLOSION_RADIUS;
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2;
+    w.effects.push({ kind: "smoke", x: cx, y: cy, vx: Math.cos(a) * 4, vy: Math.sin(a) * 4, t: 0, life: 0.7 });
+  }
+  // Blast breaks nearby bricks.
+  for (let ty = Math.floor(cy - r); ty <= Math.ceil(cy + r); ty++)
+    for (let tx = Math.floor(cx - r); tx <= Math.ceil(cx + r); tx++) {
+      if (tileAt(w, tx, ty) !== T.BRICK) continue;
+      if (Math.hypot(tx + 0.5 - cx, ty + 0.5 - cy) > r) continue;
+      setTile(w, tx, ty, T.EMPTY);
+      w.effects.push({ kind: "debris", x: tx + 0.5, y: ty + 0.5, vx: Math.sign(tx + 0.5 - cx) * 3, vy: 8, t: 0, life: 1.2 });
+    }
+  for (const o of w.enemies) {
+    if (o === e || (o.state !== "walk" && o.state !== "fuse")) continue;
+    if (Math.hypot(o.x - cx, o.y + o.h / 2 - cy) < r) kill(w, o, Math.sign(o.x - cx) || 1, 200);
+  }
+  const p = w.player;
+  if (Math.hypot(p.x - cx, p.y + p.h / 2 - cy) < r) hurtPlayer(w);
+  w.events.push("explode");
 }
 
 function stepEnemies(w: World, dt: number) {
@@ -433,16 +571,63 @@ function stepEnemies(w: World, dt: number) {
     if (e.state === "sleep") {
       if (e.x < p.x + C.ENEMY_WAKE_DISTANCE) {
         e.state = "walk";
-        e.vx = -C.ENEMY_SPEED;
+        e.vx = e.kind === "creeper" ? -C.CREEPER_SPEED : e.kind === "skeleton" ? -C.SKELETON_SPEED : -C.ENEMY_SPEED;
+        if (e.kind === "zombie") e.vx = -C.ZOMBIE_SPEED;
+        if (e.kind === "slime") e.vx = 0;
       }
       continue;
     }
-    if (e.state === "walk") {
+    const dx = p.x - e.x;
+    if (e.state === "walk" || e.state === "fuse") {
+      if (e.kind === "zombie") {
+        if (e.cooldown > 0) {
+          e.cooldown -= dt;
+          e.vx = 0;
+        } else if (Math.abs(dx) > 0.3) e.vx = Math.sign(dx) * C.ZOMBIE_SPEED;
+      } else if (e.kind === "skeleton") {
+        if (Math.abs(e.x - e.homeX) > 1.6) e.vx = -Math.sign(e.x - e.homeX) * C.SKELETON_SPEED;
+        e.cooldown -= dt;
+        if (e.cooldown <= 0 && Math.abs(dx) < C.SKELETON_RANGE && w.status === "playing") {
+          e.cooldown = C.SKELETON_RELOAD;
+          const dir = Math.sign(dx) || -1;
+          w.projectiles.push({ kind: "arrow", x: e.x + dir * 0.5, y: e.y + 1.3, vx: dir * C.ARROW_SPEED, vy: 1.5, t: 0, alive: true });
+          w.events.push("shoot");
+        }
+      } else if (e.kind === "creeper") {
+        const dist = Math.hypot(dx, p.y - e.y);
+        if (e.state === "walk" && dist < C.CREEPER_TRIGGER) {
+          e.state = "fuse";
+          e.timer = C.CREEPER_FUSE;
+          w.events.push("fuse");
+        } else if (e.state === "fuse") {
+          if (dist > C.CREEPER_CANCEL) e.state = "walk";
+          else {
+            e.timer -= dt;
+            if (e.timer <= 0) {
+              explode(w, e);
+              continue;
+            }
+          }
+        }
+        if (e.state === "walk" && Math.abs(dx) > 0.3) e.vx = Math.sign(dx) * C.CREEPER_SPEED;
+      } else if (e.kind === "slime") {
+        if (e.onGround) {
+          e.vx = 0;
+          e.cooldown -= dt;
+          if (e.cooldown <= 0) {
+            e.cooldown = C.SLIME_HOP_DELAY;
+            e.vy = C.SLIME_HOP_VY * (e.size === 1 ? 0.8 : 1);
+            e.vx = (Math.sign(dx) || -1) * C.SLIME_HOP_VX;
+            e.onGround = false;
+          }
+        }
+      }
+      const speed = e.state === "fuse" ? 0 : e.vx;
       e.vy = Math.max(e.vy - C.GRAVITY_DOWN * dt, -C.MAX_FALL);
-      if (moveX(w, e, e.vx * dt)) e.vx = -e.vx;
+      if (moveX(w, e, speed * dt)) e.vx = e.kind === "slime" ? 0 : -e.vx;
       const hit = moveY(w, e, e.vy * dt);
       e.onGround = hit.ground;
-      if (hit.ground) e.vy = 0;
+      if (hit.ground || hit.ceil) e.vy = 0;
       if (e.y < C.PIT_Y) e.state = "dead";
     } else if (e.state === "squashed") {
       e.timer -= dt;
@@ -454,14 +639,14 @@ function stepEnemies(w: World, dt: number) {
       if (e.y < -6) e.state = "dead";
     }
   }
-  // Walking enemies turn around when they bump into each other.
+  // Patrolling enemies turn around when they bump into each other.
   const n = w.enemies.length;
   for (let i = 0; i < n; i++) {
     const a = w.enemies[i]!;
-    if (a.state !== "walk") continue;
+    if (a.state !== "walk" || a.kind !== "mushling") continue;
     for (let j = i + 1; j < n; j++) {
       const b = w.enemies[j]!;
-      if (b.state !== "walk" || !overlap(a, b)) continue;
+      if (b.state !== "walk" || b.kind !== "mushling" || !overlap(a, b)) continue;
       const left = a.x < b.x ? a : b;
       const right = left === a ? b : a;
       left.vx = -Math.abs(left.vx || C.ENEMY_SPEED);
@@ -470,18 +655,42 @@ function stepEnemies(w: World, dt: number) {
   }
 }
 
+function stomp(w: World, e: Enemy) {
+  addScore(w, 100);
+  w.events.push("stomp");
+  if (e.kind === "zombie" && e.hp > 1) {
+    e.hp--;
+    e.cooldown = C.ZOMBIE_STUN;
+    return;
+  }
+  if (e.kind === "slime" && e.size === 2) {
+    e.state = "dead";
+    e.children.forEach((ci, k) => {
+      const c = w.enemies[ci];
+      if (!c) return;
+      Object.assign(c, { x: e.x + (k ? 0.5 : -0.5), y: e.y, vx: k ? 2 : -2, vy: 6, state: "walk", cooldown: 0.5 });
+    });
+    return;
+  }
+  e.state = "squashed";
+  e.timer = 0.5;
+}
+
 function playerVsEnemies(w: World, input: Input) {
   const p = w.player;
   for (const e of w.enemies) {
-    if (e.state !== "walk" || !overlap(p, e)) continue;
-    const stomp = p.vy < 0 && p.y > e.y + e.h * 0.35;
-    if (stomp) {
-      e.state = "squashed";
-      e.timer = 0.5;
+    if ((e.state !== "walk" && e.state !== "fuse") || !overlap(p, e)) continue;
+    if (p.armor > 0) {
+      kill(w, e, Math.sign(e.x - p.x) || 1, 200);
+      continue;
+    }
+    const isStomp = p.vy < 0 && p.y > e.y + e.h * 0.35;
+    if (isStomp) {
+      stomp(w, e);
       p.vy = input.jump ? C.STOMP_BOUNCE_HELD : C.STOMP_BOUNCE;
       p.jumping = true;
-      addScore(w, 100);
-      w.events.push("stomp");
+    } else if (e.kind === "zombie" && e.cooldown > 0) {
+      // A stunned zombie can't hurt you.
     } else {
       hurtPlayer(w);
       if (w.status !== "playing") return;
@@ -489,9 +698,50 @@ function playerVsEnemies(w: World, input: Input) {
   }
 }
 
-function stepMushrooms(w: World, dt: number) {
+function stepProjectiles(w: World, dt: number) {
   const p = w.player;
-  for (const m of w.mushrooms) {
+  for (const f of w.projectiles) {
+    if (!f.alive) continue;
+    f.t += dt;
+    if (f.kind === "arrow") {
+      f.vy -= 6 * dt;
+      f.x += f.vx * dt;
+      f.y += f.vy * dt;
+      if (isSolid(w, Math.floor(f.x), Math.floor(f.y)) || f.t > 3) f.alive = false;
+      else if (overlap(p, { x: f.x, y: f.y - 0.1, w: 0.5, h: 0.2 })) {
+        f.alive = false;
+        hurtPlayer(w);
+        if (w.status !== "playing") return;
+      }
+    } else {
+      f.vy -= C.GRAVITY_DOWN * 0.8 * dt;
+      f.x += f.vx * dt;
+      if (isSolid(w, Math.floor(f.x), Math.floor(f.y))) {
+        f.alive = false;
+        continue;
+      }
+      f.y += f.vy * dt;
+      if (f.vy < 0 && isSolid(w, Math.floor(f.x), Math.floor(f.y - 0.2))) {
+        f.y = Math.floor(f.y - 0.2) + 1.2;
+        f.vy = C.FIREBALL_BOUNCE;
+      }
+      if (f.t > 2.5 || f.y < C.PIT_Y) f.alive = false;
+      for (const e of w.enemies) {
+        if (!f.alive) break;
+        if (e.state !== "walk" && e.state !== "fuse") continue;
+        if (overlap(e, { x: f.x, y: f.y - 0.25, w: 0.5, h: 0.5 })) {
+          kill(w, e, Math.sign(f.vx), 200);
+          f.alive = false;
+        }
+      }
+    }
+  }
+  w.projectiles = w.projectiles.filter((f) => f.alive);
+}
+
+function stepItems(w: World, dt: number) {
+  const p = w.player;
+  for (const m of w.items) {
     if (m.state === "gone") continue;
     if (m.state === "emerging") {
       m.y += dt * 1.6;
@@ -509,14 +759,30 @@ function stepMushrooms(w: World, dt: number) {
     }
     if (m.state !== "gone" && overlap(p, m)) {
       m.state = "gone";
-      addScore(w, 1000);
-      if (!p.big) {
-        p.big = true;
-        p.h = C.BIG_H;
-      }
-      w.events.push("powerup");
+      collectPower(w, m.kind);
     }
   }
+}
+
+export function collectPower(w: World, kind: PowerKind) {
+  const p = w.player;
+  addScore(w, 1000);
+  if (!p.big) {
+    p.big = true;
+    p.h = C.BIG_H;
+  }
+  if (kind === "fire") p.fire = true;
+  if (kind === "armor") {
+    p.armor = C.ARMOR_TIME;
+    w.events.push("armor");
+    return;
+  }
+  if (kind === "totem") {
+    w.lives++;
+    w.events.push("oneup");
+    return;
+  }
+  w.events.push("powerup");
 }
 
 function collectCoins(w: World) {
@@ -572,8 +838,13 @@ function stepFlag(w: World, dt: number) {
     p.vx = 0;
     addScore(w, Math.ceil(w.time) * 50);
     w.time = 0;
-    w.status = "won";
     w.events.push("win");
+    if (w.levelIndex < LEVELS.length - 1) {
+      w.status = "clear";
+      w.clearTimer = 0;
+    } else {
+      w.status = "won";
+    }
   }
 }
 
@@ -596,12 +867,24 @@ function stepDying(w: World, dt: number) {
   }
 }
 
+/** Go straight to a level (keeps score and lives). */
+export function gotoLevel(w: World, index: number) {
+  w.levelIndex = Math.max(0, Math.min(LEVELS.length - 1, index));
+  resetLevel(w);
+  w.status = "playing";
+}
+
+function stepClear(w: World, dt: number) {
+  w.clearTimer += dt;
+  if (w.clearTimer >= C.LEVEL_CLEAR_TIME) gotoLevel(w, w.levelIndex + 1);
+}
+
 function stepEffects(w: World, dt: number) {
   for (const b of w.bumps) b.t += dt;
   w.bumps = w.bumps.filter((b) => b.t < BUMP_TIME);
   for (const e of w.effects) {
     e.t += dt;
-    e.vy -= (e.kind === "coin" ? 40 : C.GRAVITY_DOWN * 0.7) * dt;
+    e.vy -= (e.kind === "coin" ? 40 : e.kind === "smoke" ? -2 : C.GRAVITY_DOWN * 0.7) * dt;
     e.x += e.vx * dt;
     e.y += e.vy * dt;
   }
@@ -618,7 +901,9 @@ function substep(w: World, input: Input, dt: number) {
       stepEnemies(w, dt);
       playerVsEnemies(w, input);
       if (w.status !== "playing") break;
-      stepMushrooms(w, dt);
+      stepProjectiles(w, dt);
+      if (w.status !== "playing") break;
+      stepItems(w, dt);
       collectCoins(w);
       checkFlag(w);
       if (w.time <= 0 && w.status === "playing") {
@@ -631,6 +916,9 @@ function substep(w: World, input: Input, dt: number) {
       break;
     case "flag":
       stepFlag(w, dt);
+      break;
+    case "clear":
+      stepClear(w, dt);
       break;
     default:
       break;
