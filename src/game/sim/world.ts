@@ -774,7 +774,7 @@ function stepItems(w: World, dt: number) {
       if (m.y >= m.startY + 0.8) {
         m.y = m.startY + 0.8;
         m.state = "moving";
-        m.vx = C.MUSHROOM_SPEED;
+        m.vx = C.POWERUP_SPEED;
       }
     } else {
       m.vy = Math.max(m.vy - C.GRAVITY_DOWN * dt, -C.MAX_FALL);
