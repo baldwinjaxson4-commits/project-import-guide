@@ -158,6 +158,56 @@ function buildTextures() {
         for (let x = 0; x < 16; x++)
           px(x, y, x % 4 === 0 ? "#4a3218" : r() < 0.3 ? "#6b4a26" : "#7d5830");
     }),
+    sand: make(13, (px, r) => noise(px, r, ["#e8d7a0", "#dfcb8e", "#efe0ad", "#d8c283"])),
+    sandstone: make(14, (px, r) => {
+      for (let y = 0; y < 16; y++)
+        for (let x = 0; x < 16; x++) {
+          const band = y < 3 ? ["#efe0ad", "#e6d49c"] : y > 12 ? ["#c9b277", "#d4bd82"] : ["#ddc98f", "#d6c088"];
+          px(x, y, pick(r, band));
+        }
+    }),
+    snowTop: make(15, (px, r) => noise(px, r, ["#ffffff", "#f2f7fb", "#e8f0f6", "#ffffff"])),
+    snowSide: make(16, (px, r) => {
+      noise(px, r, DIRT);
+      for (let x = 0; x < 16; x++) {
+        const depth = 3 + (r() < 0.5 ? 1 : 0);
+        for (let y = 0; y < depth; y++) px(x, y, pick(r, ["#ffffff", "#eef4f8"]));
+      }
+    }),
+    cobble: make(17, (px, r) => {
+      for (let y = 0; y < 16; y++)
+        for (let x = 0; x < 16; x++) {
+          const seam = (x + Math.floor(y / 4) * 3) % 6 === 0 || y % 4 === 0;
+          px(x, y, seam ? "#4a4a4a" : pick(r, ["#7d7d7d", "#8c8c8c", "#6e6e6e", "#959595"]));
+        }
+    }),
+    deepslate: make(18, (px, r) => noise(px, r, ["#4a4a52", "#3e3e46", "#55555e", "#44444c"])),
+    ore: make(19, (px, r) => {
+      noise(px, r, ["#7d7d7d", "#8c8c8c", "#6e6e6e"]);
+      for (const [x, y] of [[3, 3], [4, 3], [10, 5], [11, 6], [5, 11], [12, 12], [11, 12]]) px(x!, y!, "#5ee6e0");
+    }),
+    netherrack: make(20, (px, r) => noise(px, r, ["#6e2222", "#7d2a2a", "#5e1a1a", "#8a3434", "#6a2020"])),
+    netherBrick: make(21, (px, r) => {
+      for (let y = 0; y < 16; y++)
+        for (let x = 0; x < 16; x++) {
+          const off = Math.floor(y / 4) % 2 ? 4 : 0;
+          const mortar = y % 4 === 3 || (x + off) % 8 === 7;
+          px(x, y, mortar ? "#1a0a0e" : r() < 0.2 ? "#3a1218" : "#4a1a20");
+        }
+    }),
+    endStone: make(22, (px, r) => noise(px, r, ["#e8eaa8", "#dfe29a", "#f0f2b8", "#d6d98e"])),
+    obsidian: make(23, (px, r) => {
+      for (let y = 0; y < 16; y++)
+        for (let x = 0; x < 16; x++) px(x, y, r() < 0.08 ? "#6a3fa0" : pick(r, ["#150f22", "#1d1530", "#100a1a"]));
+    }),
+    cactus: make(24, (px, r) => {
+      for (let y = 0; y < 16; y++)
+        for (let x = 0; x < 16; x++) px(x, y, x % 4 === 1 ? "#0f4a12" : r() < 0.06 ? "#e8e0b0" : pick(r, ["#1f7a24", "#25862a"]));
+    }),
+    spruce: make(25, (px, r) => {
+      for (let y = 0; y < 16; y++)
+        for (let x = 0; x < 16; x++) px(x, y, r() < 0.25 ? "#f4f8fb" : pick(r, ["#1e4a2a", "#245533", "#183f22"]));
+    }),
     logTop: make(12, (px) => {
       for (let y = 0; y < 16; y++)
         for (let x = 0; x < 16; x++) {
@@ -191,6 +241,20 @@ function buildMaterials() {
     pipeLip: std(t.pipeLip),
     leaves: std(t.leaves),
     log: [logSide, logSide, logTop, logTop, logSide, logSide],
+    sand: std(t.sand),
+    sandBlock: [std(t.sandstone), std(t.sandstone), std(t.sand), std(t.sandstone), std(t.sandstone), std(t.sandstone)],
+    sandstone: std(t.sandstone),
+    snowGrass: [std(t.snowSide), std(t.snowSide), std(t.snowTop), dirt, std(t.snowSide), std(t.snowSide)],
+    snow: std(t.snowTop),
+    cobble: std(t.cobble),
+    deepslate: std(t.deepslate),
+    ore: std(t.ore),
+    netherrack: std(t.netherrack),
+    netherBrick: std(t.netherBrick),
+    endStone: std(t.endStone),
+    obsidian: std(t.obsidian, { roughness: 0.4 }),
+    cactus: std(t.cactus),
+    spruce: std(t.spruce),
     cloud: new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 1, emissive: "#ffffff", emissiveIntensity: 0.35 }),
     coin: new THREE.MeshStandardMaterial({ color: "#ffc42e", roughness: 0.35, metalness: 0.4, emissive: "#ff9a00", emissiveIntensity: 0.35 }),
   };

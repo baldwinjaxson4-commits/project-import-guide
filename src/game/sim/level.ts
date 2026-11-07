@@ -12,7 +12,13 @@ export const T = {
 } as const;
 export type TileId = (typeof T)[keyof typeof T];
 
-export type Theme = "grass" | "desert" | "sky" | "nether";
+export type Theme = "grass" | "desert" | "sky" | "nether" | "cave" | "snow" | "end";
+export type EnemyKind = "mushling" | "creeper" | "zombie" | "skeleton" | "slime";
+export interface EnemySpawn {
+  x: number;
+  y: number;
+  kind: EnemyKind;
+}
 
 export interface LevelData {
   name: string;
@@ -22,7 +28,7 @@ export interface LevelData {
   height: number;
   tiles: Uint8Array;
   start: { x: number; y: number };
-  enemies: { x: number; y: number }[];
+  enemies: EnemySpawn[];
   coins: { x: number; y: number }[];
   pipes: { x: number; h: number; base: number }[];
   gaps: [number, number][];
@@ -36,7 +42,7 @@ const HEIGHT = 16;
 class Builder {
   width: number;
   tiles: Uint8Array;
-  enemies: { x: number; y: number }[] = [];
+  enemies: EnemySpawn[] = [];
   coins: { x: number; y: number }[] = [];
   pipes: { x: number; h: number; base: number }[] = [];
   constructor(public flagX: number) {
@@ -82,7 +88,14 @@ class Builder {
     for (let x = x0; x <= x1; x++) this.coins.push({ x: x + 0.5, y: y + 0.5 });
   }
   enemy(x: number, y = 2) {
-    this.enemies.push({ x, y });
+    this.enemies.push({ x, y, kind: "mushling" });
+  }
+  mob(kind: EnemyKind, x: number, y = 2) {
+    this.enemies.push({ x, y, kind });
+  }
+  /** Solid hard-block column standing on row y0. */
+  column(x: number, y0: number, h: number) {
+    for (let y = y0; y < y0 + h; y++) this.set(x, y, T.STONE);
   }
   finish(name: string, title: string, theme: Theme): LevelData {
     this.set(this.flagX, 2, T.STONE);
@@ -175,7 +188,10 @@ function grassland(): LevelData {
   b.coinRow(172, 175, 4);
   b.coinRow(192, 194, 4);
 
-  for (const x of [22, 41, 51, 53, 97, 99, 114, 115.5, 124, 125.5, 128, 129.5, 174, 175.5]) b.enemy(x);
+  for (const x of [22, 41, 51, 53, 114, 115.5, 124, 125.5, 128, 129.5]) b.enemy(x);
+  b.mob("creeper", 98);
+  b.mob("zombie", 174);
+  b.mob("slime", 177);
   b.enemy(81, 10);
   b.enemy(83, 10);
   return b.finish("1-1", "GRASSLAND", "grass");
@@ -219,7 +235,9 @@ function desert(): LevelData {
   b.pipe(152, 3);
   b.coinRow(157, 160, 4);
   b.stairs(165, 8, 1, 1);
-  for (const x of [24, 31, 37, 50, 52, 55, 78, 80, 108, 110, 112, 126, 145, 147, 158, 162]) b.enemy(x);
+  for (const x of [24, 31, 50, 52, 108, 110, 145, 147]) b.enemy(x);
+  for (const x of [37, 55, 112, 158]) b.mob("zombie", x); // husks
+  for (const x of [78, 126, 162]) b.mob("creeper", x);
   return b.finish("1-2", "DESERT DUNES", "desert");
 }
 
@@ -239,7 +257,7 @@ function skyIslands(): LevelData {
   b.platform(46, 49, 7);
   b.platform(53, 62, 3);
   b.enemy(56, 4);
-  b.enemy(59, 4);
+  b.mob("slime", 59, 4);
   b.set(57, 7, T.QCOIN);
   b.set(58, 7, T.QCOIN);
   b.platform(66, 70, 5);
@@ -251,7 +269,7 @@ function skyIslands(): LevelData {
   b.set(87, 8, T.QPOWER);
   b.set(88, 8, T.QCOIN);
   b.enemy(86, 5);
-  b.enemy(89, 5);
+  b.mob("slime", 89, 5);
   b.enemy(91, 5);
   b.platform(97, 100, 6);
   b.platform(104, 107, 8);
@@ -260,7 +278,7 @@ function skyIslands(): LevelData {
   b.pipe(116, 2, 4);
   b.enemy(113, 4);
   b.enemy(120, 4);
-  b.enemy(122, 4);
+  b.mob("creeper", 122, 4);
   b.platform(128, 131, 5);
   b.platform(135, 138, 7);
   b.set(136, 11, T.QCOIN);
@@ -308,12 +326,152 @@ function lavaCastle(): LevelData {
   b.pipe(124, 4);
   b.coinRow(130, 133, 6);
   b.stairs(140, 8, 1, 1);
-  for (const x of [16, 18, 25, 33, 35, 46, 55, 57, 72, 80, 91, 93, 116, 118, 120, 127, 136, 138]) b.enemy(x);
+  for (const x of [16, 18, 33, 35, 55, 57, 91, 93, 116, 118]) b.enemy(x);
+  for (const x of [25, 46, 80, 127]) b.mob("skeleton", x); // wither skeletons
+  for (const x of [72, 120, 138]) b.mob("slime", x); // magma cubes
   b.enemy(94, 7);
   return b.finish("1-4", "LAVA CASTLE", "nether");
 }
 
-export const LEVELS: (() => LevelData)[] = [grassland, desert, skyIslands, lavaCastle];
+function mineshaft(): LevelData {
+  const b = new Builder(176);
+  b.ground(0, b.width, [
+    [34, 37],
+    [78, 82],
+    [124, 127],
+  ]);
+  b.row(0, b.width - 1, 13, T.STONE);
+  b.row(0, b.width - 1, 14, T.STONE);
+  b.set(12, 5, T.QCOIN);
+  b.set(16, 5, T.BRICK);
+  b.set(17, 5, T.QPOWER);
+  b.set(18, 5, T.BRICK);
+  b.mob("zombie", 22);
+  b.enemy(26);
+  b.pipe(30, 2);
+  b.coinRow(34, 36, 6);
+  b.row(42, 48, 6, T.BRICK);
+  b.set(45, 6, T.QCOIN);
+  b.coinRow(42, 48, 8);
+  b.mob("skeleton", 46, 7);
+  b.mob("creeper", 52);
+  b.stairs(58, 3, 1);
+  b.stairs(64, 3, -1);
+  b.mob("zombie", 62);
+  b.pipe(70, 3);
+  b.coinRow(78, 81, 6);
+  b.row(86, 90, 5, T.BRICK);
+  b.set(88, 5, T.QPOWER);
+  b.row(86, 90, 9, T.BRICK);
+  b.set(87, 9, T.QCOIN);
+  b.set(89, 9, T.QCOIN);
+  b.mob("skeleton", 95);
+  b.mob("creeper", 100);
+  b.enemy(104);
+  b.enemy(105.5);
+  b.stairs(108, 4, 1, 1);
+  b.stairs(113, 4, -1);
+  b.coinRow(110, 114, 8);
+  b.mob("zombie", 120);
+  b.coinRow(124, 126, 6);
+  b.set(132, 5, T.QCOIN);
+  b.set(133, 5, T.QPOWER);
+  b.set(134, 5, T.QCOIN);
+  b.mob("creeper", 138);
+  b.mob("skeleton", 144);
+  b.mob("zombie", 150);
+  b.pipe(153, 2);
+  b.stairs(158, 8, 1, 1);
+  return b.finish("2-1", "MINESHAFT", "cave");
+}
+
+function taiga(): LevelData {
+  const b = new Builder(186);
+  b.ground(0, b.width, [
+    [44, 47],
+    [90, 93],
+    [140, 144],
+  ]);
+  b.set(14, 5, T.QCOIN);
+  b.set(18, 5, T.BRICK);
+  b.set(19, 5, T.QPOWER);
+  b.set(20, 5, T.BRICK);
+  b.set(19, 9, T.QCOIN);
+  b.enemy(24);
+  b.mob("slime", 30);
+  b.pipe(36, 3);
+  b.coinRow(44, 46, 6);
+  b.platform(50, 55, 5);
+  b.mob("zombie", 53, 6);
+  b.coinRow(51, 54, 7);
+  b.mob("creeper", 60);
+  b.mob("slime", 66);
+  b.pipe(72, 4);
+  b.row(78, 84, 5, T.BRICK);
+  b.set(80, 5, T.QPOWER);
+  b.set(82, 5, T.QCOIN);
+  b.row(79, 83, 9, T.BRICK);
+  b.set(81, 9, T.QCOIN);
+  b.coinRow(90, 92, 6);
+  b.mob("zombie", 98);
+  b.mob("zombie", 100);
+  b.mob("skeleton", 106);
+  b.stairs(110, 4, 1, 1);
+  b.stairs(115, 4, -1);
+  b.coinRow(112, 116, 8);
+  b.mob("creeper", 124);
+  b.mob("slime", 130);
+  b.coinRow(140, 143, 6);
+  b.set(150, 5, T.BRICK);
+  b.set(151, 5, T.QPOWER);
+  b.set(152, 5, T.BRICK);
+  b.mob("skeleton", 156);
+  b.mob("creeper", 160);
+  b.pipe(162, 2);
+  b.stairs(168, 8, 1, 1);
+  return b.finish("2-2", "SNOWY TAIGA", "snow");
+}
+
+function theEnd(): LevelData {
+  const b = new Builder(176);
+  b.ground(0, 18);
+  b.coinRow(8, 10, 4);
+  b.set(12, 5, T.QPOWER);
+  b.ground(22, 34);
+  b.enemy(28);
+  b.set(26, 5, T.QCOIN);
+  b.column(31, 2, 4);
+  b.ground(38, 52);
+  b.row(42, 46, 6, T.BRICK);
+  b.set(44, 6, T.QPOWER);
+  b.mob("creeper", 45);
+  b.mob("slime", 49);
+  b.platform(56, 60, 4);
+  b.coinRow(56, 60, 6);
+  b.ground(64, 80);
+  b.column(67, 2, 3);
+  b.mob("skeleton", 71);
+  b.mob("zombie", 77);
+  b.platform(84, 87, 4);
+  b.platform(91, 95, 3);
+  b.mob("slime", 93, 4);
+  b.ground(99, 118);
+  b.set(104, 5, T.QCOIN);
+  b.set(105, 5, T.QPOWER);
+  b.set(106, 5, T.QCOIN);
+  b.mob("creeper", 110);
+  b.mob("skeleton", 115);
+  b.platform(122, 125, 4);
+  b.platform(129, 132, 6);
+  b.coinRow(129, 132, 8);
+  b.ground(136, b.width);
+  b.mob("zombie", 142);
+  b.mob("creeper", 148);
+  b.stairs(158, 8, 1, 1);
+  return b.finish("2-3", "THE END", "end");
+}
+
+export const LEVELS: (() => LevelData)[] = [grassland, desert, skyIslands, lavaCastle, mineshaft, taiga, theEnd];
 
 export function buildLevel(index = 0): LevelData {
   const make = LEVELS[Math.max(0, Math.min(LEVELS.length - 1, index))]!;

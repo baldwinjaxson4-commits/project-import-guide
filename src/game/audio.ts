@@ -100,6 +100,22 @@ export function playSfx(e: GameEvent) {
     case "flag":
       tone(1400, 260, 1.0, { vol: 0.12 });
       break;
+    case "fuse":
+      noise(0.9, 0.12);
+      break;
+    case "explode":
+      noise(0.8, 0.6);
+      tone(120, 30, 0.6, { type: "sawtooth", vol: 0.35 });
+      break;
+    case "shoot":
+      tone(900, 300, 0.12, { type: "triangle", vol: 0.2 });
+      break;
+    case "fireball":
+      tone(700, 180, 0.1, { vol: 0.15 });
+      break;
+    case "armor":
+      notes([523, 784, 1047, 1568, 2093], 0.06, { type: "triangle", vol: 0.2 });
+      break;
     case "win":
       notes([392, 523, 659, 784, 1047, 1319, 1568, 1319], 0.11, { vol: 0.15 });
       break;

@@ -3,6 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { getGame } from "../game";
 import { BOX, getMaterials } from "./textures";
+import { themeLook, type ThemeLook } from "./themes";
 
 type V3 = [number, number, number];
 
@@ -40,7 +41,7 @@ function rng(seed: number) {
   };
 }
 
-function buildDecor(width: number, gaps: [number, number][], castleX: number) {
+function buildDecor(width: number, gaps: [number, number][], castleX: number, look: ThemeLook) {
   const r = rng(7);
   const inGap = (x: number) => gaps.some(([a, b]) => x >= a - 1 && x < b + 1);
   const grass: V3[] = [];
@@ -50,9 +51,12 @@ function buildDecor(width: number, gaps: [number, number][], castleX: number) {
   const clouds: V3[] = [];
   const bricks: V3[] = [];
   const dark: V3[] = [];
+  const cactus: V3[] = [];
+  const spruce: V3[] = [];
+  const pillars: V3[] = [];
 
   // Stepped voxel hills far behind the play lane.
-  for (let hx = 0; hx < width; hx += 24 + Math.floor(r() * 10)) {
+  for (let hx = 0; look.hills && hx < width; hx += 24 + Math.floor(r() * 10)) {
     const size = r() < 0.5 ? 4 : 3;
     for (let level = 0; level < size; level++) {
       const half = size - level;
@@ -67,6 +71,27 @@ function buildDecor(width: number, gaps: [number, number][], castleX: number) {
   for (let tx = 9; tx < castleX - 8; tx += 17 + Math.floor(r() * 12)) {
     if (inGap(tx)) continue;
     const z = -3;
+    if (look.tree === "none") break;
+    if (look.tree === "cactus") {
+      const h = 2 + Math.floor(r() * 3);
+      for (let y = 0; y < h; y++) cactus.push([tx + 0.5, 2.5 + y, z]);
+      continue;
+    }
+    if (look.tree === "pillar") {
+      const h = 6 + Math.floor(r() * 6);
+      for (let y = 0; y < h; y++) for (const dx of [0, 1]) pillars.push([tx + dx + 0.5, 2.5 + y, z - 6]);
+      continue;
+    }
+    if (look.tree === "spruce") {
+      const trunk = 2 + Math.floor(r() * 2);
+      for (let y = 0; y < trunk; y++) logs.push([tx + 0.5, 2.5 + y, z]);
+      let y = 2 + trunk;
+      for (const half of [2, 1, 1, 0]) {
+        for (let dx = -half; dx <= half; dx++) for (let dz = -half; dz <= half; dz++) spruce.push([tx + dx + 0.5, y + 0.5, z + dz]);
+        y++;
+      }
+      continue;
+    }
     const trunk = 3 + Math.floor(r() * 2);
     for (let y = 0; y < trunk; y++) logs.push([tx + 0.5, 2.5 + y, z]);
     const ly = 2 + trunk;
@@ -79,7 +104,7 @@ function buildDecor(width: number, gaps: [number, number][], castleX: number) {
     for (let dx = -1; dx <= 1; dx++) leaves.push([tx + dx + 0.5, ly + 1.5, z]);
   }
   // Bushes along the back row of the ground.
-  for (let bx = 4; bx < castleX - 6; bx += 11 + Math.floor(r() * 9)) {
+  for (let bx = 4; look.tree === "oak" && bx < castleX - 6; bx += 11 + Math.floor(r() * 9)) {
     if (inGap(bx)) continue;
     const len = 2 + Math.floor(r() * 3);
     for (let dx = 0; dx < len; dx++) {
@@ -88,7 +113,7 @@ function buildDecor(width: number, gaps: [number, number][], castleX: number) {
     }
   }
   // Blocky clouds.
-  for (let cx = 6; cx < width + 10; cx += 13 + Math.floor(r() * 10)) {
+  for (let cx = 6; look.clouds && cx < width + 10; cx += 13 + Math.floor(r() * 10)) {
     const cy = 11 + Math.floor(r() * 3);
     const len = 3 + Math.floor(r() * 3);
     const z = -12 - Math.floor(r() * 4);
@@ -108,20 +133,20 @@ function buildDecor(width: number, gaps: [number, number][], castleX: number) {
   for (let x = 0; x < 5; x += 2) bricks.push([c0 + x + 0.5, 7.5, -1]);
   for (let x = 1; x < 4; x++) bricks.push([c0 + x + 0.5, 8.5, -1]);
   for (let x = 1; x < 4; x += 2) bricks.push([c0 + x + 0.5, 9.5, -1]);
-  return { grass, dirt, leaves, logs, clouds, bricks, dark };
+  return { grass, dirt, leaves, logs, clouds, bricks, dark, cactus, spruce, pillars };
 }
 
 const DARK = new THREE.MeshStandardMaterial({ color: "#120a06", roughness: 1 });
 
 /** Large grass field behind the play lane so background hills and trees sit on land. */
-function Field({ width }: { width: number }) {
+function Field({ width, base }: { width: number; base: THREE.Material }) {
   const mat = useMemo(() => {
-    const tex = getMaterials().grass[2]!.map!.clone();
+    const tex = (base as THREE.MeshStandardMaterial).map!.clone();
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(width + 40, 30);
     tex.needsUpdate = true;
     return new THREE.MeshStandardMaterial({ map: tex, roughness: 1 });
-  }, [width]);
+  }, [width, base]);
   return (
     <mesh rotation-x={-Math.PI / 2} position={[width / 2, 1.99, -16.5]} material={mat} receiveShadow>
       <planeGeometry args={[width + 40, 30]} />
@@ -132,16 +157,20 @@ function Field({ width }: { width: number }) {
 export function Decor() {
   const mats = getMaterials();
   const { level } = getGame().world;
-  const d = useMemo(() => buildDecor(level.width, level.gaps, level.castleX), [level]);
+  const look = themeLook(level.theme);
+  const d = useMemo(() => buildDecor(level.width, level.gaps, level.castleX, look), [level, look]);
   return (
     <>
-      <Field width={level.width} />
-      <Instances positions={d.grass} material={mats.grass} />
-      <Instances positions={d.dirt} material={mats.dirt} />
+      <Field width={level.width} base={look.field} />
+      <Instances positions={d.grass} material={look.top} />
+      <Instances positions={d.dirt} material={look.fill} />
+      <Instances positions={d.cactus} material={mats.cactus} shadows />
+      <Instances positions={d.spruce} material={mats.spruce} shadows />
+      <Instances positions={d.pillars} material={mats.obsidian} />
       <Instances positions={d.leaves} material={mats.leaves} shadows />
       <Instances positions={d.logs} material={mats.log} shadows />
       <Instances positions={d.clouds} material={mats.cloud} />
-      <Instances positions={d.bricks} material={mats.brick} shadows />
+      <Instances positions={d.bricks} material={level.theme === "nether" || level.theme === "end" ? look.stone : mats.brick} shadows />
       <Instances positions={d.dark} material={DARK} />
       <FlagPole />
     </>

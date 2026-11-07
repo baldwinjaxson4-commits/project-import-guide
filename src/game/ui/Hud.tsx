@@ -40,7 +40,7 @@ function TouchButton({ k, children, wide }: { k: keyof Input; children: ReactNod
 }
 
 export function Hud() {
-  const { score, coins, lives, time, status, muted } = useHud();
+  const { score, coins, lives, time, status, muted, worldName, worldTitle, power } = useHud();
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none">
@@ -54,9 +54,10 @@ export function Hud() {
             </span>
           }
         />
-        <Stat label="WORLD" value="1-1" />
+        <Stat label="WORLD" value={worldName} />
         <Stat label="TIME" value={pad(time, 3)} />
         <Stat label="LIVES" value={`♥×${lives}`} />
+        {power && <Stat label="POWER" value={power} />}
         <button
           type="button"
           className="pointer-events-auto hud-chip"
@@ -75,16 +76,24 @@ export function Hud() {
           <h1 className="title-logo">
             SUPER <span className="title-accent">BLOCK</span> BROS
           </h1>
-          <p className="overlay-text">A blocky run to the flag</p>
+          <p className="overlay-text">7 worlds · creepers, zombies, skeletons &amp; slimes</p>
           <button type="button" className="pixel-btn pointer-events-auto" onClick={beginOrRestart}>
             START
           </button>
           <ul className="controls-list">
             <li>ARROWS / A D &nbsp; move</li>
             <li>SPACE / W / Z &nbsp; jump</li>
-            <li>SHIFT / X &nbsp; run</li>
+            <li>SHIFT / X &nbsp; run / throw fire</li>
             <li>ENTER &nbsp; start</li>
           </ul>
+        </Overlay>
+      )}
+      {status === "clear" && (
+        <Overlay>
+          <h2 className="title-logo">
+            {worldName} <span className="title-accent">CLEAR!</span>
+          </h2>
+          <p className="overlay-text">{worldTitle} done · next world coming up</p>
         </Overlay>
       )}
       {status === "gameover" && (

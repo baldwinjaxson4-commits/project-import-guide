@@ -5,6 +5,7 @@ import { getGame } from "../game";
 import { T } from "../sim/level";
 import { BUMP_TIME } from "../sim/world";
 import { BOX, getMaterials } from "./textures";
+import { themeLook } from "./themes";
 
 const GROUND_DEPTH = [-1, 0, 1];
 const M = new THREE.Matrix4();
@@ -17,6 +18,15 @@ export function Tiles() {
   const mats = getMaterials();
   const refs = useRef<Partial<Record<Key, THREE.InstancedMesh>>>({});
   const last = useRef({ version: -1, bumping: false });
+  const look = themeLook(getGame().world.level.theme);
+  const matFor: Record<Key, THREE.Material | THREE.Material[]> = {
+    grass: look.top,
+    dirt: look.fill,
+    brick: mats.brick,
+    question: mats.question,
+    used: mats.used,
+    stone: look.stone,
+  };
 
   const capacity = useMemo(() => {
     const { level } = getGame().world;
@@ -89,7 +99,7 @@ export function Tiles() {
           ref={(m) => {
             if (m) refs.current[k] = m;
           }}
-          args={[BOX, mats[k] as THREE.Material | THREE.Material[], capacity[k]]}
+          args={[BOX, matFor[k], capacity[k]]}
           frustumCulled={false}
           castShadow
           receiveShadow

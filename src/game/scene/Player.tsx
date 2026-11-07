@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { getGame } from "../game";
@@ -23,16 +23,24 @@ function Vox({
   size,
   pos,
   color,
+  mat,
 }: {
   size: [number, number, number];
   pos: [number, number, number];
-  color: string;
+  color?: string;
+  mat?: THREE.Material;
 }) {
   return (
-    <mesh position={pos} castShadow>
-      <boxGeometry args={size} />
-      <meshStandardMaterial color={color} roughness={0.9} />
-    </mesh>
+    <>{mat ? (
+      <mesh position={pos} castShadow material={mat}>
+        <boxGeometry args={size} />
+      </mesh>
+    ) : (
+      <mesh position={pos} castShadow>
+        <boxGeometry args={size} />
+        <meshStandardMaterial color={color ?? "#ffffff"} roughness={0.9} />
+      </mesh>
+    )}</>
   );
 }
 
@@ -45,6 +53,8 @@ export function Player() {
   const armL = useRef<THREE.Group>(null);
   const armR = useRef<THREE.Group>(null);
   const anim = useRef({ scale: SMALL_SCALE, yaw: Math.PI / 2, phase: 0 });
+  const shirt = useMemo(() => new THREE.MeshStandardMaterial({ color: COLORS.red, roughness: 0.9 }), []);
+  const pants = useMemo(() => new THREE.MeshStandardMaterial({ color: COLORS.blue, roughness: 0.9 }), []);
 
   useFrame((_, delta) => {
     const w = getGame().world;
@@ -88,6 +98,22 @@ export function Player() {
     armL.current!.rotation.x = aL;
     armR.current!.rotation.x = aR;
 
+    // Fire Charge: white & red outfit. Diamond Armor: shimmering diamond outfit.
+    if (p.armor > 0) {
+      const pulse = 0.5 + 0.5 * Math.sin(w.elapsed * 12);
+      shirt.color.set("#5ee6e0");
+      pants.color.set("#2fb8c0");
+      shirt.emissive.set("#40e0ff");
+      shirt.emissiveIntensity = 0.2 + pulse * 0.5;
+      pants.emissive.set("#40e0ff");
+      pants.emissiveIntensity = 0.1 + pulse * 0.3;
+    } else {
+      shirt.color.set(p.fire ? COLORS.white : COLORS.red);
+      pants.color.set(p.fire ? COLORS.red : COLORS.blue);
+      shirt.emissiveIntensity = 0;
+      pants.emissiveIntensity = 0;
+    }
+
     const blink = p.invuln > 0 && Math.floor(w.elapsed * 20) % 2 === 0;
     root.current.visible = p.visible && !blink;
   });
@@ -97,26 +123,26 @@ export function Player() {
       <group ref={body}>
         {/* legs (pivot at hip) */}
         <group ref={legL} position={[-0.17, 0.72, 0]}>
-          <Vox size={[0.3, 0.55, 0.34]} pos={[0, -0.28, 0]} color={COLORS.blue} />
+          <Vox size={[0.3, 0.55, 0.34]} pos={[0, -0.28, 0]} mat={pants} />
           <Vox size={[0.32, 0.2, 0.46]} pos={[0, -0.62, 0.06]} color={COLORS.shoe} />
         </group>
         <group ref={legR} position={[0.17, 0.72, 0]}>
-          <Vox size={[0.3, 0.55, 0.34]} pos={[0, -0.28, 0]} color={COLORS.blue} />
+          <Vox size={[0.3, 0.55, 0.34]} pos={[0, -0.28, 0]} mat={pants} />
           <Vox size={[0.32, 0.2, 0.46]} pos={[0, -0.62, 0.06]} color={COLORS.shoe} />
         </group>
         {/* torso */}
-        <Vox size={[0.7, 0.56, 0.44]} pos={[0, 0.98, 0]} color={COLORS.red} />
-        <Vox size={[0.72, 0.22, 0.46]} pos={[0, 0.8, 0]} color={COLORS.blue} />
-        <Vox size={[0.46, 0.3, 0.04]} pos={[0, 1.02, 0.23]} color={COLORS.blue} />
+        <Vox size={[0.7, 0.56, 0.44]} pos={[0, 0.98, 0]} mat={shirt} />
+        <Vox size={[0.72, 0.22, 0.46]} pos={[0, 0.8, 0]} mat={pants} />
+        <Vox size={[0.46, 0.3, 0.04]} pos={[0, 1.02, 0.23]} mat={pants} />
         <Vox size={[0.08, 0.08, 0.04]} pos={[-0.15, 1.1, 0.26]} color={COLORS.gold} />
         <Vox size={[0.08, 0.08, 0.04]} pos={[0.15, 1.1, 0.26]} color={COLORS.gold} />
         {/* arms (pivot at shoulder) */}
         <group ref={armL} position={[-0.45, 1.2, 0]}>
-          <Vox size={[0.2, 0.46, 0.24]} pos={[0, -0.2, 0]} color={COLORS.red} />
+          <Vox size={[0.2, 0.46, 0.24]} pos={[0, -0.2, 0]} mat={shirt} />
           <Vox size={[0.22, 0.2, 0.24]} pos={[0, -0.5, 0]} color={COLORS.white} />
         </group>
         <group ref={armR} position={[0.45, 1.2, 0]}>
-          <Vox size={[0.2, 0.46, 0.24]} pos={[0, -0.2, 0]} color={COLORS.red} />
+          <Vox size={[0.2, 0.46, 0.24]} pos={[0, -0.2, 0]} mat={shirt} />
           <Vox size={[0.22, 0.2, 0.24]} pos={[0, -0.5, 0]} color={COLORS.white} />
         </group>
         {/* head */}
@@ -127,8 +153,8 @@ export function Player() {
         <Vox size={[0.08, 0.12, 0.03]} pos={[-0.14, 1.6, 0.28]} color={COLORS.black} />
         <Vox size={[0.08, 0.12, 0.03]} pos={[0.14, 1.6, 0.28]} color={COLORS.black} />
         {/* cap */}
-        <Vox size={[0.62, 0.18, 0.6]} pos={[0, 1.84, 0]} color={COLORS.red} />
-        <Vox size={[0.62, 0.07, 0.24]} pos={[0, 1.77, 0.38]} color={COLORS.red} />
+        <Vox size={[0.62, 0.18, 0.6]} pos={[0, 1.84, 0]} mat={shirt} />
+        <Vox size={[0.62, 0.07, 0.24]} pos={[0, 1.77, 0.38]} mat={shirt} />
         <Vox size={[0.18, 0.14, 0.03]} pos={[0, 1.86, 0.31]} color={COLORS.white} />
       </group>
     </group>
