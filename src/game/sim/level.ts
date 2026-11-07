@@ -87,17 +87,38 @@ class Builder {
   coinRow(x0: number, x1: number, y: number) {
     for (let x = x0; x <= x1; x++) this.coins.push({ x: x + 0.5, y: y + 0.5 });
   }
-  enemy(x: number, y = 2) {
+  /** Spawn a mob; without y it stands on the first surface above the bottom of the world. */
+  enemy(x: number, y = NaN) {
     this.enemies.push({ x, y, kind: "spider" });
   }
-  mob(kind: EnemyKind, x: number, y = 2) {
+  mob(kind: EnemyKind, x: number, y = NaN) {
     this.enemies.push({ x, y, kind });
+  }
+  /** Solid ground from the bottom of the world up to (not including) row `top`. */
+  terrain(x0: number, x1: number, top: number) {
+    for (let x = x0; x < x1; x++) for (let y = 0; y < top; y++) this.set(x, y, T.GROUND);
+  }
+  /** Hard-block tower from the bottom of the world; its top is at row `top`. */
+  tower(x0: number, x1: number, top: number) {
+    for (let x = x0; x <= x1; x++) for (let y = 0; y < top; y++) this.set(x, y, T.STONE);
+  }
+  /** Rock roof hanging from the top of the world down to row yBottom. */
+  hang(x0: number, x1: number, yBottom: number) {
+    for (let x = x0; x < Math.min(x1, this.width); x++) for (let y = yBottom; y < HEIGHT; y++) this.set(x, y, T.STONE);
+  }
+  surface(x: number): number {
+    const tx = Math.floor(x);
+    for (let y = 1; y < HEIGHT; y++) {
+      if (this.tiles[(y - 1) * this.width + tx] !== T.EMPTY && this.tiles[y * this.width + tx] === T.EMPTY) return y;
+    }
+    return 2;
   }
   /** Solid hard-block column standing on row y0. */
   column(x: number, y0: number, h: number) {
     for (let y = y0; y < y0 + h; y++) this.set(x, y, T.STONE);
   }
   finish(name: string, title: string, theme: Theme): LevelData {
+    for (const e of this.enemies) if (Number.isNaN(e.y)) e.y = this.surface(e.x);
     this.set(this.flagX, 2, T.STONE);
     const gaps: [number, number][] = [];
     let start = -1;
@@ -200,44 +221,52 @@ function grassland(): LevelData {
 function desert(): LevelData {
   const b = new Builder(182);
   b.ground(0, b.width, [
-    [40, 43],
-    [95, 99],
+    [58, 61],
+    [96, 99],
     [132, 135],
   ]);
-  b.set(14, 5, T.QCOIN);
-  b.set(17, 5, T.BRICK);
-  b.set(18, 5, T.QPOWER);
-  b.set(19, 5, T.BRICK);
-  b.set(18, 9, T.QCOIN);
-  b.pipe(26, 3);
-  b.pipe(34, 2);
-  b.coinRow(40, 42, 6);
-  b.row(47, 54, 5, T.BRICK);
-  b.set(50, 5, T.QCOIN);
-  b.set(52, 5, T.QPOWER);
-  b.row(49, 53, 9, T.BRICK);
-  b.set(51, 9, T.QCOIN);
-  b.coinRow(49, 53, 10);
-  b.stairs(60, 3, 1);
-  b.stairs(66, 3, -1);
-  b.coinRow(63, 65, 6);
-  b.pipe(74, 4);
-  b.pipe(84, 3);
-  b.coinRow(95, 98, 6);
-  b.row(103, 105, 5, T.QCOIN);
-  b.set(104, 9, T.QPOWER);
-  b.stairs(116, 4, 1, 1);
-  b.stairs(121, 4, -1);
-  b.set(128, 5, T.BRICK);
-  b.set(129, 5, T.QCOIN);
-  b.set(130, 5, T.BRICK);
-  b.pipe(140, 2);
-  b.pipe(152, 3);
-  b.coinRow(157, 160, 4);
-  b.stairs(165, 8, 1, 1);
-  for (const x of [24, 31, 50, 52, 108, 110, 145, 147]) b.enemy(x);
-  for (const x of [37, 55, 112, 158]) b.mob("zombie", x); // husks
-  for (const x of [78, 126, 162]) b.mob("creeper", x);
+  // Rolling sand dunes
+  b.terrain(14, 20, 3);
+  b.terrain(16, 18, 4);
+  b.coinRow(16, 17, 6);
+  b.terrain(25, 34, 3);
+  b.terrain(27, 32, 4);
+  b.terrain(29, 31, 5);
+  b.set(29, 9, T.QCOIN);
+  b.set(30, 9, T.QPOWER);
+  // Desert temple: a stepped pyramid to climb
+  b.terrain(40, 56, 3);
+  b.terrain(42, 54, 4);
+  b.terrain(44, 52, 5);
+  b.terrain(46, 50, 6);
+  b.terrain(47, 49, 7);
+  b.coinRow(44, 51, 9);
+  b.set(48, 11, T.QPOWER);
+  b.coinRow(58, 60, 5);
+  // Oasis with sandstone wells
+  b.column(66, 2, 2);
+  b.column(72, 2, 3);
+  b.column(78, 2, 2);
+  b.coinRow(71, 73, 7);
+  b.row(84, 90, 6, T.BRICK);
+  b.set(86, 6, T.QCOIN);
+  b.set(88, 6, T.QPOWER);
+  // Second dune field
+  b.terrain(102, 110, 3);
+  b.terrain(104, 108, 4);
+  b.terrain(114, 124, 3);
+  b.terrain(116, 122, 5);
+  b.terrain(118, 120, 6);
+  b.coinRow(118, 119, 8);
+  // Sandstone ruins: floating ledges
+  b.platform(138, 142, 5);
+  b.platform(146, 150, 7);
+  b.platform(154, 158, 5);
+  b.set(148, 11, T.QCOIN);
+  b.coinRow(146, 150, 9);
+  for (const x of [17, 30, 50, 82, 119, 144]) b.mob("zombie", x); // husks
+  for (const x of [22, 64, 92, 128, 168]) b.mob("creeper", x);
+  for (const x of [36, 45, 75, 106, 160]) b.mob("spider", x);
   return b.finish("1-2", "DESERT DUNES", "desert");
 }
 
@@ -249,36 +278,34 @@ function skyIslands(): LevelData {
   b.platform(20, 25, 4);
   b.coinRow(21, 24, 6);
   b.platform(29, 33, 6);
-  b.enemy(31, 7);
+  b.mob("spider", 31, 7);
   b.platform(37, 42, 4);
   b.set(39, 8, T.BRICK);
   b.set(40, 8, T.QPOWER);
   b.set(41, 8, T.BRICK);
   b.platform(46, 49, 7);
   b.platform(53, 62, 3);
-  b.enemy(56, 4);
+  b.mob("spider", 56, 4);
   b.mob("slime", 59, 4);
   b.set(57, 7, T.QCOIN);
   b.set(58, 7, T.QCOIN);
   b.platform(66, 70, 5);
   b.coinRow(66, 70, 7);
   b.platform(74, 78, 8);
-  b.enemy(76, 9);
+  b.mob("skeleton", 76, 9);
   b.platform(82, 93, 4);
   b.row(85, 90, 8, T.BRICK);
   b.set(87, 8, T.QPOWER);
   b.set(88, 8, T.QCOIN);
-  b.enemy(86, 5);
+  b.mob("zombie", 86, 5);
   b.mob("slime", 89, 5);
-  b.enemy(91, 5);
   b.platform(97, 100, 6);
   b.platform(104, 107, 8);
   b.coinRow(104, 107, 10);
   b.platform(111, 124, 3);
-  b.pipe(116, 2, 4);
-  b.enemy(113, 4);
-  b.enemy(120, 4);
-  b.mob("creeper", 122, 4);
+  b.tower(116, 117, 6);
+  b.mob("spider", 113, 4);
+  b.mob("creeper", 120, 4);
   b.platform(128, 131, 5);
   b.platform(135, 138, 7);
   b.set(136, 11, T.QCOIN);
@@ -286,192 +313,233 @@ function skyIslands(): LevelData {
   b.platform(142, 145, 5);
   b.platform(149, 152, 3);
   b.ground(156, b.width);
-  b.stairs(162, 6, 1, 1);
   b.coinRow(157, 160, 4);
-  b.enemy(159);
+  b.mob("zombie", 159);
   return b.finish("1-3", "SKY ISLANDS", "sky");
 }
 
-function lavaCastle(): LevelData {
+function netherFortress(): LevelData {
   const b = new Builder(156);
-  b.ground(0, b.width, [
-    [20, 23],
-    [38, 44],
-    [60, 64],
-    [82, 88],
-    [110, 113],
-    [130, 134],
-  ]);
-  b.pillar(40, 4);
-  b.pillar(41, 4);
-  b.pillar(62, 3);
-  b.pillar(84, 3);
-  b.pillar(85, 5);
-  b.set(12, 5, T.QCOIN);
-  b.set(14, 5, T.QPOWER);
-  b.row(26, 30, 5, T.BRICK);
-  b.set(28, 5, T.QCOIN);
-  b.set(28, 9, T.QPOWER);
-  b.stairs(48, 3, 1);
-  b.stairs(51, 3, -1);
-  b.pipe(68, 3);
-  b.pipe(76, 2);
-  b.row(92, 99, 6, T.BRICK);
-  b.set(95, 6, T.QCOIN);
-  b.set(96, 6, T.QPOWER);
-  b.coinRow(92, 99, 8);
-  b.stairs(102, 4, 1, 1);
-  b.row(117, 121, 5, T.BRICK);
-  b.set(119, 5, T.QCOIN);
-  b.pipe(124, 4);
-  b.coinRow(130, 133, 6);
-  b.stairs(140, 8, 1, 1);
-  for (const x of [16, 18, 33, 35, 55, 57, 91, 93, 116, 118]) b.enemy(x);
-  for (const x of [25, 46, 80, 127]) b.mob("skeleton", x); // wither skeletons
-  for (const x of [72, 120, 138]) b.mob("slime", x); // magma cubes
-  b.enemy(94, 7);
-  return b.finish("1-4", "LAVA CASTLE", "nether");
+  b.ground(0, 14);
+  b.set(9, 5, T.QCOIN);
+  // Lava lake crossed on netherrack pillars
+  b.terrain(17, 19, 3);
+  b.terrain(22, 24, 4);
+  b.terrain(27, 29, 5);
+  b.terrain(32, 35, 6);
+  b.coinRow(22, 23, 7);
+  b.coinRow(27, 28, 8);
+  b.set(33, 10, T.QPOWER);
+  // Nether fortress bridge high above the lava, with a broken span
+  b.row(38, 70, 6, T.STONE);
+  for (const x of [42, 50, 62, 70]) b.column(x, 0, 6);
+  for (const x of [54, 55, 56]) b.set(x, 6, T.EMPTY);
+  b.row(46, 48, 10, T.BRICK);
+  b.set(47, 10, T.QCOIN);
+  b.coinRow(54, 56, 9);
+  b.mob("skeleton", 45, 7);
+  b.mob("spider", 52, 7);
+  b.mob("skeleton", 60, 7);
+  b.mob("slime", 66, 7);
+  // Fortress hall with a low roof
+  b.ground(71, 100);
+  b.hang(74, 98, 9);
+  b.set(80, 5, T.BRICK);
+  b.set(81, 5, T.QPOWER);
+  b.set(82, 5, T.BRICK);
+  b.tower(86, 88, 4);
+  b.set(91, 5, T.QCOIN);
+  b.set(93, 5, T.QCOIN);
+  b.mob("skeleton", 78);
+  b.mob("spider", 84);
+  b.mob("slime", 90);
+  b.mob("zombie", 95);
+  // Lava crossing on floating netherrack
+  b.platform(103, 106, 3);
+  b.platform(110, 113, 5);
+  b.platform(117, 120, 4);
+  b.platform(124, 127, 3);
+  b.coinRow(110, 113, 7);
+  b.mob("slime", 111, 6);
+  b.mob("spider", 118, 5);
+  // Final stretch
+  b.ground(130, b.width);
+  b.tower(136, 138, 4);
+  b.set(137, 8, T.QCOIN);
+  b.mob("skeleton", 142);
+  b.mob("slime", 146);
+  return b.finish("1-4", "NETHER FORTRESS", "nether");
 }
 
 function mineshaft(): LevelData {
   const b = new Builder(176);
   b.ground(0, b.width, [
-    [34, 37],
-    [78, 82],
-    [124, 127],
+    [38, 42],
+    [104, 107],
+    [118, 121],
   ]);
-  b.row(0, b.width - 1, 13, T.STONE);
-  b.row(0, b.width - 1, 14, T.STONE);
+  // Entrance tunnel
+  b.hang(0, 30, 9);
   b.set(12, 5, T.QCOIN);
-  b.set(16, 5, T.BRICK);
-  b.set(17, 5, T.QPOWER);
-  b.set(18, 5, T.BRICK);
-  b.mob("zombie", 22);
-  b.enemy(26);
-  b.pipe(30, 2);
-  b.coinRow(34, 36, 6);
-  b.row(42, 48, 6, T.BRICK);
-  b.set(45, 6, T.QCOIN);
-  b.coinRow(42, 48, 8);
-  b.mob("skeleton", 46, 7);
-  b.mob("creeper", 52);
-  b.stairs(58, 3, 1);
-  b.stairs(64, 3, -1);
-  b.mob("zombie", 62);
-  b.pipe(70, 3);
-  b.coinRow(78, 81, 6);
-  b.row(86, 90, 5, T.BRICK);
-  b.set(88, 5, T.QPOWER);
-  b.row(86, 90, 9, T.BRICK);
-  b.set(87, 9, T.QCOIN);
-  b.set(89, 9, T.QCOIN);
-  b.mob("skeleton", 95);
-  b.mob("creeper", 100);
-  b.enemy(104);
-  b.enemy(105.5);
-  b.stairs(108, 4, 1, 1);
-  b.stairs(113, 4, -1);
-  b.coinRow(110, 114, 8);
-  b.mob("zombie", 120);
-  b.coinRow(124, 126, 6);
-  b.set(132, 5, T.QCOIN);
-  b.set(133, 5, T.QPOWER);
-  b.set(134, 5, T.QCOIN);
-  b.mob("creeper", 138);
-  b.mob("skeleton", 144);
-  b.mob("zombie", 150);
-  b.pipe(153, 2);
-  b.stairs(158, 8, 1, 1);
+  b.set(16, 5, T.QPOWER);
+  b.mob("spider", 20);
+  b.mob("zombie", 26);
+  // Big cavern with a ravine and a rocky ledge
+  b.hang(30, 60, 14);
+  b.terrain(32, 37, 3);
+  b.column(40, 0, 3);
+  b.terrain(44, 52, 5);
+  b.terrain(46, 50, 7);
+  b.coinRow(46, 49, 9);
+  b.set(48, 11, T.QPOWER);
+  b.mob("creeper", 34);
+  b.mob("skeleton", 48);
+  b.mob("spider", 56);
+  // Low tunnel with blocks set into the roof
+  b.hang(60, 100, 7);
+  b.set(68, 7, T.QCOIN);
+  b.set(76, 7, T.QPOWER);
+  b.set(84, 7, T.QCOIN);
+  b.set(92, 7, T.QCOIN);
+  b.coinRow(70, 74, 4);
+  b.coinRow(86, 90, 4);
+  b.mob("spider", 66);
+  b.mob("zombie", 72);
+  b.mob("spider", 80);
+  b.mob("creeper", 88);
+  b.mob("spider", 96);
+  // Flooded cavern with a stone shelf
+  b.hang(100, 130, 12);
+  b.platform(110, 114, 6);
+  b.set(112, 10, T.QCOIN);
+  b.mob("skeleton", 112, 7);
+  b.mob("slime", 125);
+  // Ore staircase up and down
+  b.hang(130, 150, 11);
+  b.terrain(132, 148, 3);
+  b.terrain(134, 146, 4);
+  b.terrain(136, 144, 5);
+  b.terrain(138, 142, 6);
+  b.coinRow(138, 141, 8);
+  b.mob("zombie", 140);
+  b.mob("spider", 145);
+  // Exit cavern with a high roof
+  b.hang(150, b.width, 14);
+  b.mob("creeper", 158);
+  b.mob("skeleton", 165);
   return b.finish("2-1", "MINESHAFT", "cave");
 }
 
 function taiga(): LevelData {
   const b = new Builder(186);
   b.ground(0, b.width, [
-    [44, 47],
-    [90, 93],
-    [140, 144],
+    [40, 44],
+    [84, 87],
+    [93, 96],
+    [118, 122],
+    [150, 153],
   ]);
-  b.set(14, 5, T.QCOIN);
-  b.set(18, 5, T.BRICK);
-  b.set(19, 5, T.QPOWER);
-  b.set(20, 5, T.BRICK);
-  b.set(19, 9, T.QCOIN);
-  b.enemy(24);
-  b.mob("slime", 30);
-  b.pipe(36, 3);
-  b.coinRow(44, 46, 6);
-  b.platform(50, 55, 5);
-  b.mob("zombie", 53, 6);
-  b.coinRow(51, 54, 7);
-  b.mob("creeper", 60);
-  b.mob("slime", 66);
-  b.pipe(72, 4);
-  b.row(78, 84, 5, T.BRICK);
-  b.set(80, 5, T.QPOWER);
-  b.set(82, 5, T.QCOIN);
-  b.row(79, 83, 9, T.BRICK);
-  b.set(81, 9, T.QCOIN);
-  b.coinRow(90, 92, 6);
-  b.mob("zombie", 98);
-  b.mob("zombie", 100);
-  b.mob("skeleton", 106);
-  b.stairs(110, 4, 1, 1);
-  b.stairs(115, 4, -1);
-  b.coinRow(112, 116, 8);
-  b.mob("creeper", 124);
-  b.mob("slime", 130);
-  b.coinRow(140, 143, 6);
-  b.set(150, 5, T.BRICK);
-  b.set(151, 5, T.QPOWER);
-  b.set(152, 5, T.BRICK);
-  b.mob("skeleton", 156);
-  b.mob("creeper", 160);
-  b.pipe(162, 2);
-  b.stairs(168, 8, 1, 1);
+  // Climb the snowy mountain
+  b.terrain(12, 40, 3);
+  b.terrain(18, 40, 5);
+  b.terrain(24, 40, 7);
+  b.terrain(30, 40, 9);
+  b.coinRow(31, 37, 11);
+  b.set(33, 13, T.QCOIN);
+  b.set(35, 13, T.QPOWER);
+  // Over the ravine and back down
+  b.terrain(44, 52, 9);
+  b.terrain(52, 58, 7);
+  b.terrain(58, 66, 5);
+  b.terrain(66, 74, 3);
+  b.coinRow(40, 43, 12);
+  // Frozen lake with ice holes
+  b.row(78, 82, 6, T.BRICK);
+  b.set(80, 6, T.QCOIN);
+  b.coinRow(84, 86, 5);
+  b.coinRow(93, 95, 5);
+  // Second hill split by a gorge
+  b.terrain(100, 118, 4);
+  b.terrain(106, 118, 6);
+  b.terrain(122, 136, 4);
+  b.terrain(122, 130, 6);
+  b.set(127, 10, T.QPOWER);
+  b.coinRow(118, 121, 9);
+  // Valley to the flag
+  b.row(156, 160, 5, T.BRICK);
+  b.set(158, 5, T.QCOIN);
+  b.mob("spider", 14);
+  b.mob("slime", 22);
+  b.mob("zombie", 28);
+  b.mob("creeper", 36);
+  b.mob("skeleton", 48);
+  b.mob("zombie", 56);
+  b.mob("spider", 62);
+  b.mob("slime", 70);
+  b.mob("zombie", 80);
+  b.mob("spider", 90);
+  b.mob("creeper", 98);
+  b.mob("skeleton", 110);
+  b.mob("slime", 126);
+  b.mob("zombie", 132);
+  b.mob("creeper", 145);
+  b.mob("spider", 162);
+  b.mob("skeleton", 170);
   return b.finish("2-2", "SNOWY TAIGA", "snow");
 }
 
 function theEnd(): LevelData {
   const b = new Builder(176);
-  b.ground(0, 18);
+  b.ground(0, 14);
   b.coinRow(8, 10, 4);
-  b.set(12, 5, T.QPOWER);
-  b.ground(22, 34);
-  b.enemy(28);
-  b.set(26, 5, T.QCOIN);
-  b.column(31, 2, 4);
-  b.ground(38, 52);
-  b.row(42, 46, 6, T.BRICK);
-  b.set(44, 6, T.QPOWER);
-  b.mob("creeper", 45);
+  b.set(11, 5, T.QPOWER);
+  // Obsidian towers over the void
+  b.tower(17, 19, 4);
+  b.tower(22, 24, 6);
+  b.tower(27, 29, 8);
+  b.tower(32, 34, 6);
+  b.tower(37, 39, 9);
+  b.tower(42, 44, 7);
+  b.tower(47, 51, 5);
+  b.tower(54, 57, 3);
+  b.coinRow(27, 28, 10);
+  b.set(38, 13, T.QCOIN);
+  b.mob("spider", 23);
   b.mob("slime", 49);
-  b.platform(56, 60, 4);
-  b.coinRow(56, 60, 6);
-  b.ground(64, 80);
-  b.column(67, 2, 3);
-  b.mob("skeleton", 71);
-  b.mob("zombie", 77);
-  b.platform(84, 87, 4);
-  b.platform(91, 95, 3);
-  b.mob("slime", 93, 4);
-  b.ground(99, 118);
-  b.set(104, 5, T.QCOIN);
-  b.set(105, 5, T.QPOWER);
-  b.set(106, 5, T.QCOIN);
-  b.mob("creeper", 110);
-  b.mob("skeleton", 115);
-  b.platform(122, 125, 4);
-  b.platform(129, 132, 6);
-  b.coinRow(129, 132, 8);
-  b.ground(136, b.width);
-  b.mob("zombie", 142);
+  // Main End island
+  b.ground(60, 90);
+  b.terrain(68, 76, 4);
+  b.terrain(70, 74, 5);
+  b.tower(80, 81, 5);
+  b.row(63, 66, 6, T.BRICK);
+  b.set(65, 6, T.QPOWER);
+  b.mob("creeper", 64);
+  b.mob("zombie", 72);
+  b.mob("skeleton", 85);
+  // Floating end stone stairs
+  b.platform(93, 96, 3);
+  b.platform(99, 102, 5);
+  b.platform(105, 108, 7);
+  b.platform(111, 114, 5);
+  b.platform(117, 120, 3);
+  b.set(106, 12, T.QPOWER);
+  b.coinRow(105, 108, 9);
+  b.mob("slime", 100, 6);
+  b.mob("spider", 112, 6);
+  // Final island
+  b.ground(123, b.width);
+  b.tower(130, 132, 4);
+  b.tower(136, 138, 6);
+  b.tower(142, 144, 4);
+  b.coinRow(136, 137, 8);
+  b.mob("zombie", 134);
   b.mob("creeper", 148);
-  b.stairs(158, 8, 1, 1);
+  b.mob("skeleton", 156);
+  b.mob("spider", 162);
   return b.finish("2-3", "THE END", "end");
 }
 
-export const LEVELS: (() => LevelData)[] = [grassland, desert, skyIslands, lavaCastle, mineshaft, taiga, theEnd];
+export const LEVELS: (() => LevelData)[] = [grassland, desert, skyIslands, netherFortress, mineshaft, taiga, theEnd];
 
 export function buildLevel(index = 0): LevelData {
   const make = LEVELS[Math.max(0, Math.min(LEVELS.length - 1, index))]!;
