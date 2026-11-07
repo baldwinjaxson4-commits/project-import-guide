@@ -93,6 +93,17 @@ function FireChargeModel() {
     </>
   );
 }
+function SwordModel() {
+  const blade = "#5ee6e0";
+  return (
+    <group rotation-z={Math.PI / 4} position={[0, 0.45, 0]}>
+      <Box size={[0.1, 0.22, 0.1]} pos={[0, -0.36, 0]} color="#3a2a16" />
+      <Box size={[0.34, 0.08, 0.12]} pos={[0, -0.22, 0]} color="#3a2a16" />
+      <Box size={[0.14, 0.62, 0.06]} pos={[0, 0.12, 0]} color={blade} glow="#20b0b0" />
+      <Box size={[0.07, 0.1, 0.06]} pos={[0, 0.47, 0]} color={blade} glow="#20b0b0" />
+    </group>
+  );
+}
 function ArmorModel() {
   const c = "#5ee6e0";
   return (
@@ -117,7 +128,7 @@ function TotemModel() {
   );
 }
 
-const MODELS = { apple: AppleModel, fire: FireChargeModel, armor: ArmorModel, totem: TotemModel };
+const MODELS = { apple: AppleModel, fire: FireChargeModel, sword: SwordModel, armor: ArmorModel, totem: TotemModel };
 
 function PowerupModel({ index }: { index: number }) {
   const ref = useRef<THREE.Group>(null);

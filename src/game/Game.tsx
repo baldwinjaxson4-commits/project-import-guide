@@ -69,7 +69,7 @@ function Stepper({ onReady, sunIntensity }: { onReady: () => void; sunIntensity:
 
     const hud = useHud.getState();
     const time = Math.ceil(w.time);
-    const power = p.armor > 0 ? `ARMOR ${Math.ceil(p.armor)}` : p.fire ? "FIRE" : "";
+    const power = p.armor > 0 ? `ARMOR ${Math.ceil(p.armor)}` : p.fire ? "FIRE" : p.sword ? "SWORD" : "";
     if (
       hud.score !== w.score ||
       hud.coins !== w.coinCount ||

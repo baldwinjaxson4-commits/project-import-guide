@@ -76,14 +76,14 @@ export function Hud() {
           <h1 className="title-logo">
             SUPER <span className="title-accent">BLOCK</span> BROS
           </h1>
-          <p className="overlay-text">7 worlds · creepers, zombies, skeletons &amp; slimes</p>
+          <p className="overlay-text">Play as Steve · 7 worlds of Minecraft mobs</p>
           <button type="button" className="pixel-btn pointer-events-auto" onClick={beginOrRestart}>
             START
           </button>
           <ul className="controls-list">
             <li>ARROWS / A D &nbsp; move</li>
             <li>SPACE / W / Z &nbsp; jump</li>
-            <li>SHIFT / X &nbsp; run / throw fire</li>
+            <li>SHIFT / X &nbsp; run / swing sword / throw fire</li>
             <li>ENTER &nbsp; start</li>
           </ul>
         </Overlay>

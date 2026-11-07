@@ -110,6 +110,10 @@ export function playSfx(e: GameEvent) {
     case "shoot":
       tone(900, 300, 0.12, { type: "triangle", vol: 0.2 });
       break;
+    case "swing":
+      noise(0.12, 0.2);
+      tone(1200, 500, 0.1, { type: "triangle", vol: 0.15 });
+      break;
     case "fireball":
       tone(700, 180, 0.1, { vol: 0.15 });
       break;
