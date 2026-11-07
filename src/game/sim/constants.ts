@@ -39,3 +39,27 @@ export const START_LIVES = 3;
 
 export const MAX_SUBSTEP = 1 / 120;
 export const PIT_Y = -4;
+
+// Minecraft mobs
+export const CREEPER_SPEED = 1.6;
+export const CREEPER_TRIGGER = 2.4; // starts hissing when the player is this close
+export const CREEPER_CANCEL = 4.5; // stops hissing when the player gets this far away
+export const CREEPER_FUSE = 1.3;
+export const EXPLOSION_RADIUS = 2.6;
+export const ZOMBIE_SPEED = 1.5;
+export const ZOMBIE_HP = 2;
+export const ZOMBIE_STUN = 0.6;
+export const SKELETON_SPEED = 0.9;
+export const SKELETON_RANGE = 13;
+export const SKELETON_RELOAD = 2.4;
+export const ARROW_SPEED = 9;
+export const SLIME_HOP_VY = 10;
+export const SLIME_HOP_VX = 2.6;
+export const SLIME_HOP_DELAY = 0.9;
+
+// Power-ups
+export const ARMOR_TIME = 10;
+export const FIREBALL_SPEED = 12;
+export const FIREBALL_BOUNCE = 7;
+export const MAX_FIREBALLS = 2;
+export const LEVEL_CLEAR_TIME = 3;
