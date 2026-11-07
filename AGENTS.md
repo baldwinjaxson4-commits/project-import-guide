@@ -7,24 +7,11 @@
 >
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
-
-## What Lovable manages
-
-Rules outside this block are the project's own. Change the pieces below in
-Lovable, not by hand. With the [Lovable MCP](https://mcp.lovable.dev)
-connected, `send_message` asks Lovable to do it; otherwise ask the user to
-use the editor.
-
-- **Database.** Do not add or edit `supabase/migrations/` or `drizzle/`.
-  Ask Lovable to change the schema.
-- **Generated files.** Do not edit a file whose header says it is automatically
-  generated.
-- **AI gateway.** Keep model calls on Lovable's gateway, and keep
-  `LOVABLE_API_KEY` out of browser code.
-- **Connectors.** Lovable provides native connectors. `list_connectors` shows
-  which are enabled; `add_connector` only returns the dashboard link. When a
-  connector is enabled, calls go through the connector gateway and need
-  `LOVABLE_API_KEY`. When Lovable does not provide one, users can bring their
-  own key and store it in Secrets.
-- **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Game architecture
+- Game rules live in `src/game/sim/` as plain TypeScript (no React/three imports) with vitest tests in `world.test.ts`; the scene only draws sim state, so physics can be tested without a GPU.
+- One stepper `useFrame` in `src/game/Game.tsx` advances input → sim → sounds → camera → HUD; per-frame state stays in the shared `getGame()` object, and only HUD values go to the zustand store (avoids 60 re-renders/s).
+- Feel values (gravity, jump, speeds) are named constants in `src/game/sim/constants.ts`; tune there, not inline.
+- Dev-only `window.__game` exposes `world`, `start()` and `sim(seconds, input)` for scripted checks in the slow sandbox browser.
+- Block textures are generated 16x16 canvas pixel art in `src/game/scene/textures.ts` (no image files to load).
