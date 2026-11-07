@@ -25,11 +25,8 @@ function useMob(index: number, extra?: (e: Enemy, t: number) => void) {
     const w = getGame().world;
     const e = w.enemies[index];
     if (!root.current || !body.current || !e) return;
-    root.current.visible = e.state !== "dead" && e.state !== "sleep" ? true : e.state === "sleep";
-    if (e.state === "dead") {
-      root.current.visible = false;
-      return;
-    }
+    root.current.visible = e.state !== "dead";
+    if (e.state === "dead") return;
     root.current.position.set(e.x, e.y, 0);
     body.current.scale.set(1, e.state === "squashed" ? 0.3 : 1, 1);
     body.current.rotation.z = e.state === "flipped" ? Math.PI : 0;
