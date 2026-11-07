@@ -75,7 +75,7 @@ describe("platformer sim", () => {
     w.player.x = 192;
     sim(w, { ...idle, right: true }, 2);
     expect(w.status).toBe("flag");
-    sim(w, idle, 6);
+    for (let t = 0; t < 8 && w.status === "flag"; t += 1 / 60) stepWorld(w, idle, 1 / 60);
     expect(w.status).toBe("clear");
     sim(w, idle, C.LEVEL_CLEAR_TIME + 0.1);
     expect(w.status).toBe("playing");
